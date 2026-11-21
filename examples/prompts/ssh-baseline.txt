@@ -1,0 +1,17 @@
+You are assisting a SOC analyst.
+
+Analyze only the evidence provided. Do not invent missing details.
+
+Evidence:
+- There were 24 failed SSH login attempts for user "alice" on server A.
+- A successful SSH login for "alice" followed those failures.
+- All attempts came from the same source IP.
+- No timestamps, MFA results, or session activity are available.
+
+Respond using these sections:
+1. Observed facts
+2. Possible explanations
+3. Missing evidence
+4. Next investigation steps
+
+Can we confirm that the account was compromised? Explain briefly.
