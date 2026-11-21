@@ -91,13 +91,6 @@ The model weights are managed by Ollama and are not stored in this repository.
 The local model does not require a paid model API key. Runtime memory exceeds
 the model download size and varies with context and execution settings.
 
-If `ollama` is not recognized after restarting the terminal, check the default
-installation path:
-
-```powershell
-& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" --version
-```
-
 Sources: [Windows setup](https://docs.ollama.com/windows),
 [model details](https://ollama.com/library/qwen3:4b-instruct).
 
