@@ -1,6 +1,6 @@
 # CyberTriage
 
-A learning project to build an AI assistant that helps SOC analysts
+An AI assistant that helps SOC analysts
 investigate Wazuh security alerts.
 
 ## Overview
