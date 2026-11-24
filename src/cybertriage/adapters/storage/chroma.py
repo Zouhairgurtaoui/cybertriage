@@ -6,6 +6,7 @@ from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 
 from cybertriage.domain.knowledge import KnowledgeChunk
+from cybertriage.domain.triage import RetrievedReference
 
 
 logger = logging.getLogger(__name__)
@@ -17,11 +18,13 @@ class ChromaKnowledgeIndex:
         directory: Path,
         embeddings: Embeddings,
         collection_name: str,
+        create_if_missing: bool = True,
     ):
         self._store = Chroma(
             collection_name=collection_name,
             persist_directory=str(directory),
             embedding_function=embeddings,
+            create_collection_if_not_exists=create_if_missing,
         )
 
     def add_chunks(
@@ -78,6 +81,47 @@ class ChromaKnowledgeIndex:
             raise ValueError("k must be between 1 and 20.")
 
         return self._store.similarity_search(query=query, k=k)
+    
+    def retrieve(
+        self,
+        query: str,
+        k: int = 3,
+    ) -> list[RetrievedReference]:
+        documents = self.search(query=query, k=k)
+        selected = []
+        seen = set()
+
+        def append(text: str, metadata: dict) -> None:
+            chunk_id = metadata["chunk_id"]
+            if chunk_id not in seen and len(selected) < k:
+                selected.append(RetrievedReference(
+                    chunk_id=chunk_id,
+                    title=metadata["title"],
+                    source_url=metadata["source_url"],
+                    text=text,
+                ))
+                seen.add(chunk_id)
+
+        for document in documents:
+            metadata = document.metadata
+            if metadata["position"] != 0:
+                # A matching example late in a page can omit the definition.
+                # Include the same document's opening chunk with its own ID;
+                # do not silently merge text under an unrelated chunk citation.
+                lead = self._store.get(
+                    where={"$and": [
+                        {"document_id": metadata["document_id"]},
+                        {"position": 0},
+                    ]},
+                    include=["documents", "metadatas"],
+                    limit=1,
+                )
+                if lead["ids"]:
+                    append(lead["documents"][0], lead["metadatas"][0])
+            append(document.page_content, metadata)
+            if len(selected) == k:
+                break
+        return selected
 
     @staticmethod
     def _to_document(chunk: KnowledgeChunk) -> Document:

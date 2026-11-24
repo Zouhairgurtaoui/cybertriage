@@ -1,0 +1,22 @@
+schema_version: 1
+
+# Policy configuration does not install or execute a firewall integration.
+execution_enabled: false
+approval_ttl_seconds: 900
+
+actions:
+  block_ip:
+    enabled: true
+    requires_compromise_confirmation: true
+    requires_analyst_approval: true
+    allowed_targets:
+      - lab-firewall
+    required_parameters:
+      - ip_address
+      - duration_seconds
+    max_duration_seconds: 3600
+    protected_networks:
+      - 127.0.0.0/8
+      - ::1/128
+      - 169.254.0.0/16
+      - fe80::/10

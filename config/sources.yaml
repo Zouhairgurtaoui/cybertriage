@@ -1,0 +1,27 @@
+schema_version: 1
+
+chunking:
+  size: 1200
+  overlap: 150
+
+event_catalog_url: https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/plan/security-best-practices/advanced-audit-policy-configuration
+
+sources:
+  mitre:
+    enabled: true
+    revision: a8db2f52eb933c9c99060c123e088b3326d3a607
+    collection: mitre_a8db2f52eb93_nomic_v1
+
+  microsoft:
+    enabled: true
+    collection: microsoft_events_nomic_v1
+    base_url: https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing
+    pages:
+      - slug: audit-security-group-management
+        expected_heading: Audit Security Group Management
+      - slug: event-4740
+        expected_heading: '4740(S):'
+      - slug: event-4624
+        expected_heading: '4624(S):'
+      - slug: event-4648
+        expected_heading: '4648(S):'

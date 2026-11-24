@@ -1,6 +1,7 @@
 from typing import Protocol
 
 from cybertriage.domain.knowledge import KnowledgeDocument
+from cybertriage.domain.knowledge import KnowledgeChunk
 
 
 class KnowledgeSource(Protocol):
@@ -12,4 +13,11 @@ class KnowledgeSource(Protocol):
 
         Raise an exception when fetching or parsing fails.
         """
+        ...
+
+class KnowledgeChunker(Protocol):
+    def split(
+        self,
+        document: KnowledgeDocument,
+    ) -> list[KnowledgeChunk]:
         ...

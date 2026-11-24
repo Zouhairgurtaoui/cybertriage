@@ -47,15 +47,120 @@ and investigation tools.
 
 ## Current Status
 
-Early model evaluation and documentation.
+The CLI supports MITRE/Microsoft knowledge retrieval, local Windows Security
+event definitions, and analysis using `qwen3:4b-instruct` through Ollama.
+The model returns a readable five-section report. Generation checks reject empty,
+non-text, or unfinished responses; there is no required model JSON schema,
+account-name masking, or automatic repair loop. Reports are provisional and
+require analyst review. The instruct model is the development baseline, with
+thinking disabled in the client configuration.
 
-The GitHub repository is initialized. Two local model variants have been
-tested manually using a synthetic SSH alert. `qwen3:4b-instruct` is the
-provisional baseline, pending further evaluation.
+Knowledge ingestion and retrieval read `config/sources.yaml`. Response eligibility
+reads `config/response_actions.yaml` through a separate application policy.
+There is no firewall executor or approval-storage workflow yet. The Wazuh
+receiver, investigation tools, API, and deployment integration remain planned. See
+[implementation status](docs/implementation-status.md).
 
-The Python application, RAG pipeline, agent tools, and Wazuh webhook
-are not yet implemented in this repository. The manual tests did not
-access Wazuh or execute investigation tools.
+## Install the Python Application
+
+The tested Windows development runtime is Python 3.12. Create and activate
+a virtual environment from the repository root:
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e .
+python -m cybertriage --version
+```
+
+Ollama must also have `qwen3:4b-instruct` and `nomic-embed-text` installed.
+Run commands from the repository root unless supplying explicit data paths.
+
+## Catalogue and Analysis Commands
+
+Update and inspect the local event catalogue:
+
+```powershell
+python -m cybertriage catalog-update
+python -m cybertriage event-lookup --event-id 4728
+```
+
+The analysis command expects populated MITRE and Microsoft Chroma collections
+in `data/chroma`. Populate the enabled sources with:
+
+```powershell
+python -m cybertriage ingest --source mitre
+python -m cybertriage ingest --source microsoft
+```
+
+Sources, collections, the pinned MITRE revision, Microsoft pages, and chunking
+settings are loaded from `config/sources.yaml`. Disabled sources are excluded
+from retrieval and cannot be ingested. Use `--sources-config PATH` with
+`analyze`, `ingest`, or `catalog-update` to select another configuration file.
+
+Once both collections are populated:
+
+```powershell
+python -m cybertriage analyze --evidence examples/alerts/privilege-change.txt --event-id 4728 --provider Microsoft-Windows-Security-Auditing --channel Security --output data/reports/privilege-change.json
+```
+
+Only supply event metadata actually present in the incident input. An unknown
+event has no catalogue definition. The model is instructed to preserve unknowns
+and use supplied references, but its reasoning and citations are not automatically
+certified. Empty or unfinished generation fails without an automatic retry.
+
+`--output` saves the report text and source metadata in an application JSON file;
+the model itself is not required to generate JSON. `--model` or the
+`CYBERTRIAGE_MODEL` environment variable can select an already installed model.
+These commands do not download model weights.
+
+## Configuration and Response Policy
+
+- `config/sources.yaml`: source enablement, pinned revision, document pages,
+  catalogue URL, collection names, and chunking settings.
+- `config/response_actions.yaml`: execution enablement, action allowlist,
+  approved target identifiers, required parameters, approval lifetime, duration
+  limits, and protected networks.
+
+`protected_networks` is an operator-defined list of CIDRs. Private lab networks
+are not automatically exempt from blocking. An empty list adds no CIDR-based
+exclusions; the policy still enforces approval, targets, parameters and duration.
+The example configuration currently protects only loopback/link-local ranges.
+These rules affect response eligibility, not model generation or investigation.
+
+Keep the existing collection names when reusing the current index. When changing
+the MITRE revision or chunking policy, use new collection names and ingest them
+before analysis; obsolete versions are not automatically removed.
+
+Preview policy eligibility without creating approval or executing anything:
+
+```powershell
+python -m cybertriage response-policy --case-id CASE-1 --action block_ip --target lab-firewall --parameters-file examples/actions/block-ip.json
+```
+
+The JSON file supplies example action parameters, not model output or policy
+configuration. `lab-firewall` is a logical target identifier; no firewall
+connection is configured by this example. Execution is disabled by default.
+The preview always lacks analyst approval. Its optional `--disposition` argument
+is a what-if input, not a stored case-review decision.
+
+The policy binds approval to the exact case, action, target, and parameters.
+Changing those fields changes the proposal fingerprint. An authenticated review
+workflow and execution adapter are future components; the policy alone does not
+implement them. Adding an entry to YAML cannot create an arbitrary command:
+an action also needs a registered parameter validator and, later, an executor.
+
+See [architecture](docs/architecture.md) for the ports-and-adapters boundaries.
+
+When you choose to evaluate reports manually (CPU inference can take several minutes):
+
+```powershell
+python -m cybertriage.entrypoints.evaluation --output data/evaluations/latest.json
+```
+
+The JSON records execution completion/failure and retains text reports for manual
+semantic review. Completion is not a claim of error-free investigation.
+Generated reports and downloaded data remain under the ignored `data/` folder.
 
 ## Local Model Setup
 
@@ -72,7 +177,6 @@ The initial model tests use Ollama on the Windows host, outside the Wazuh VM.
 
    ```powershell
    ollama pull qwen3:4b-instruct
-   ollama show qwen3:4b-instruct
    ```
 
 6. Start a manual test with timing statistics:
@@ -97,8 +201,10 @@ Sources: [Windows setup](https://docs.ollama.com/windows),
 Design decisions, learning notes, experiments, and evaluation results
 will be documented as the project progresses:
 
-- [Experiment 001: local model comparison](docs/experiments/001-local-model-baseline.md)
-- [Decision 001: provisional model selection](docs/decisions/001-local-model-selection.md)
+- [Implementation and acceptance status](docs/implementation-status.md)
+- [Analysis evaluation criteria](docs/evaluation.md)
+- [Architecture and trust boundaries](docs/architecture.md)
+- [Live evaluation cases](config/evaluation-cases.json)
 - [Baseline SSH prompt](examples/prompts/ssh-baseline.txt)
 
 Further installation, configuration, and usage instructions will be added
