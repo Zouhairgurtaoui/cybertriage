@@ -20,24 +20,6 @@ flowchart TD
     Policy --> Preview[Eligibility preview only]
 ```
 
-## Responsibilities and SOLID
-
-- **Single responsibility:** YAML adapters parse configuration; source adapters
-  fetch documents; the model adapter handles generation; the policy decides
-  action eligibility; entrypoints handle arguments and presentation.
-- **Open/closed:** application use cases work through small contracts. Source
-  factories and action validators are registered in the composition root.
-  New integrations require adapters/configuration wiring rather than changes
-  to analysis orchestration.
-- **Substitution:** source implementations expose `fetch()`, model adapters
-  expose `analyze() -> str`, and retrievers expose `retrieve()`. They must
-  preserve the meaning of these contracts, including visible failures.
-- **Interface segregation:** knowledge configuration, response configuration,
-  retrieval, generation, source loading and action parameter validation use
-  separate protocols; analysis does not depend on action execution methods.
-- **Dependency inversion:** application use cases depend on protocols and domain
-  objects. They do not import YAML, Chroma, Requests, or Ollama clients.
-
 ## Patterns used
 
 - **Ports and adapters:** domain/application code is separated from integrations.
