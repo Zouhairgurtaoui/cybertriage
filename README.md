@@ -62,22 +62,20 @@ access Wazuh or execute investigation tools.
 The initial model tests use Ollama on the Windows host, outside the Wazuh VM.
 
 1. Install [Ollama for Windows](https://ollama.com/download/windows).
-2. Restart PowerShell. If using VS Code, close all VS Code windows and reopen
-   it so its terminal inherits the updated PATH.
-3. Check the installed version:
+2. Check the installed version:
 
    ```powershell
    ollama --version
    ```
 
-4. Download the selected candidate, approximately 2.5 GB:
+3. Download the selected candidate, approximately 2.5 GB:
 
    ```powershell
    ollama pull qwen3:4b-instruct
    ollama show qwen3:4b-instruct
    ```
 
-5. Start a manual test with timing statistics:
+6. Start a manual test with timing statistics:
 
    ```powershell
    ollama run qwen3:4b-instruct --verbose
