@@ -17,3 +17,10 @@ class KnowledgeDocument:
     def content_hash(self) -> str:
         content = f"{self.title}\n{self.text}"
         return sha256(content.encode("utf-8")).hexdigest()
+
+@dataclass(frozen=True)
+class KnowledgeChunk:
+    chunk_id: str
+    document: KnowledgeDocument
+    position: int
+    text: str
