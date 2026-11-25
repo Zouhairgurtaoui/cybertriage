@@ -125,11 +125,39 @@ alert. These intentionally adverse fixture values verify accounting and audit
 behavior; they do not estimate operational suppression quality or detection
 accuracy. The default operational configuration still has zero suppression rules.
 
-### Remaining coverage
+### Boundary and regression suite
 
-The recorded runs do not establish group behavior at the member limit, arrivals
-after claim/completion, host isolation, rollback under storage failure, audit
-trigger enforcement, or complete report accuracy. Zero-denominator evaluation
-rates, uncertain final labels, and pre-policy populations require additional
-cases. The isolated fixture ingestion exercised application/storage behavior;
-HTTP ingestion with the revised triage response also requires regression coverage.
+`scripts/validate_triage_boundaries.py` completed with **29/29 grouped checks
+passed and zero failures** on 2026-11-25.
+
+```powershell
+python scripts/validate_triage_boundaries.py
+```
+
+Result artifact:
+`data/validation/boundaries-4602d0d4a70742b79e9c7d592daa691c/results.json`.
+
+The fixture suite covered:
+
+- Invalid configuration keys, duplicate IDs, timestamps, field paths, and budgets.
+- Group capacity, host/manager/account/window isolation, and late arrivals after
+  claim or completion.
+- Concurrent grouping/deduplication, scheduling delay, conflicting content,
+  transactional rollback, and append-only audit enforcement.
+- Empty/unreviewed/uncertain evaluation, pre-policy populations, legacy duplicate
+  handling, and rollback of a failed feedback/release transaction.
+- In-process HTTP authentication, JSON/size limits, grouping, duplicate/conflict
+  responses, and suppression without automatic scheduling.
+- Exact grounding scope, sourced definitions, unresolved codes/tokens, oversized
+  tool results, invalid arguments, and explicit source failures.
+- Bounded model/tool orchestration, duplicate requests/call IDs, registered-tool
+  restrictions, unfinished responses, context limits, and task/evidence separation.
+
+### Remaining operational validation
+
+The suite uses isolated SQLite files, an in-process HTTP client, a fixture
+searcher, and a scripted model. It does not contact a live Indexer or model and
+does not establish real-model instruction following, injection resistance,
+investigation accuracy, representative suppression quality, or deployment
+performance. Validate grounded reports against retained live evidence and assess
+deployment transport, backup/recovery, and realistic workloads separately.

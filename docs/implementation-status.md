@@ -53,7 +53,7 @@ application data; the model is not required to generate JSON.
 
 - Cross-technique incident/case correlation and Neo4j projection.
 - Background-worker tool-calling integration and additional investigation tools.
-- Broader grounding/report-quality validation and triage/grouping boundary cases.
+- Real-model grounding/report-quality evaluation and operational workload validation.
 - Authenticated analyst review, stored approvals and audit records.
 - Allowlisted response executors connected to the response policy.
 - API endpoints for the future analyst web application.
@@ -75,6 +75,12 @@ worker report with sourced definitions for both members, suppression scope and
 expiry, severity/protected-event overrides, append-only feedback, release, and
 evaluation of a deliberately unsafe suppression. These results and remaining
 coverage are recorded in [triage validation](validation/triage.md).
+
+The isolated boundary/regression harness subsequently passed all 29 grouped
+checks, covering concurrency, transaction rollback, audit enforcement, HTTP
+ingestion responses, evaluation edge cases, grounding/tool budgets, and model
+orchestration with scripted substitutes. This is separate from live model
+accuracy and deployment validation.
 
 The report recorder stores generated outputs under ignored `data/evaluations/`.
 Execution completion and semantic review are tracked separately. Review criteria
