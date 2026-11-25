@@ -40,9 +40,17 @@ from cybertriage.application.use_cases.analyze_stored_alert import (
 )
 
 from cybertriage.application.ports.agent import InvestigationModel
+from cybertriage.application.ports.triage_policy import TriageConfigurationProvider
 
 DEFAULT_SOURCES_CONFIG = Path("config/sources.yaml")
 DEFAULT_RESPONSE_CONFIG = Path("config/response_actions.yaml")
+DEFAULT_TRIAGE_CONFIG = Path("config/triage.yaml")
+DEFAULT_AUTHENTICATION_REGISTRY = Path("config/windows-authentication-codes.json")
+
+
+def build_authentication_grounder():
+    from cybertriage.adapters.knowledge.authentication_grounding import MicrosoftAuthenticationGrounder
+    return MicrosoftAuthenticationGrounder(DEFAULT_AUTHENTICATION_REGISTRY)
 
 
 def _load_knowledge(
@@ -143,7 +151,7 @@ def build_analyze_alert(
         investigator = OllamaInvestigationModel(
             model=ollama,
             tools=[
-                build_authentication_search_tool(searcher),
+                build_authentication_search_tool(searcher, grounder=build_authentication_grounder()),
             ],
         )
 
@@ -225,7 +233,12 @@ def build_response_preview(
     )
     return PreviewResponseAction(policy)
 
-def build_alert_ingestion(database_path: Path):
+def build_alert_ingestion(
+    database_path: Path,
+    triage_config_path: Path = DEFAULT_TRIAGE_CONFIG,
+    *,
+    configuration: TriageConfigurationProvider | None = None,
+):
     from cybertriage.adapters.storage.alerts_sqlite import (
         SqliteAlertRepository,
     )
@@ -235,19 +248,25 @@ def build_alert_ingestion(database_path: Path):
     from cybertriage.application.use_cases.ingest_alert import (
         IngestAlert,
     )
+    from cybertriage.adapters.configuration.triage_yaml import YamlTriageConfiguration
+    from cybertriage.application.policies.alert_triage import AlertTriagePolicy
+
+    provider = configuration if configuration is not None else YamlTriageConfiguration(triage_config_path)
+    policy = AlertTriagePolicy(provider.load())
 
     return IngestAlert(
         normalizer=WazuhAlertNormalizer(),
-        repository=SqliteAlertRepository(database_path),
+        repository=SqliteAlertRepository(database_path, triage_policy=policy),
     )
 
 def build_ingestion_api(
     database_path: Path,
     token: str,
+    triage_config_path: Path = DEFAULT_TRIAGE_CONFIG,
 ):
     from cybertriage.entrypoints.api.app import create_app
 
-    ingestion = build_alert_ingestion(database_path)
+    ingestion = build_alert_ingestion(database_path, triage_config_path)
 
     return create_app(
         ingestion=ingestion,
@@ -275,6 +294,8 @@ def build_analyze_stored_alert(
 
     reader = SqliteAlertRepository(alerts_database_path)
     writer = SqliteAnalysisWriter(alerts_database_path)
+    from cybertriage.adapters.storage.triage_sqlite import SqliteTriageReviewRepository
+    grounder = build_authentication_grounder()
 
     return AnalyzeStoredAlert(
         reader=reader,
@@ -285,6 +306,8 @@ def build_analyze_stored_alert(
             sources_config_path=sources_config_path,
         ),
         writer=writer,
+        group_reader=SqliteTriageReviewRepository(alerts_database_path, grounder=grounder),
+        grounder=grounder,
     )
 
 def build_analysis_worker(
@@ -324,6 +347,8 @@ def build_analysis_worker(
     SqliteAnalysisWriter(alerts_database_path)
 
     queue = SqliteAnalysisQueue(alerts_database_path)
+    from cybertriage.adapters.storage.triage_sqlite import SqliteTriageReviewRepository
+    grounder = build_authentication_grounder()
 
     processor = ProcessAnalysisJob(
         reader=reader,
@@ -334,6 +359,8 @@ def build_analysis_worker(
             sources_config_path=sources_config_path,
         ),
         completer=queue,
+        group_reader=SqliteTriageReviewRepository(alerts_database_path, grounder=grounder),
+        grounder=grounder,
     )
 
     return AnalysisWorker(
@@ -384,3 +411,15 @@ def build_authentication_search(
             ca_bundle=settings.ca_bundle,
         )
     )
+
+
+def build_triage_review(database_path: Path):
+    from cybertriage.adapters.storage.triage_sqlite import SqliteTriageReviewRepository
+    from cybertriage.application.services.triage_review import ReviewTriage
+    return ReviewTriage(SqliteTriageReviewRepository(database_path))
+
+
+def build_triage_evaluation(database_path: Path):
+    from cybertriage.adapters.storage.triage_sqlite import SqliteTriageReviewRepository
+    from cybertriage.application.services.triage_review import EvaluateTriage
+    return EvaluateTriage(SqliteTriageReviewRepository(database_path))

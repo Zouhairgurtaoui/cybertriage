@@ -64,6 +64,12 @@ Background-worker investigation tools and the analyst web application remain
 planned. See
 [implementation status](docs/implementation-status.md).
 
+Ingestion includes auditable triage and candidate grouping before job scheduling.
+Operator commands support analyst feedback and suppression-quality evaluation.
+Authentication results include computed search summaries and sourced code
+definitions. These features require deployment validation; model reports remain
+provisional.
+
 ## Install the Python Application
 
 The tested Windows development runtime is Python 3.12. Create and activate
@@ -124,6 +130,10 @@ These commands do not download model weights.
 - `config/response_actions.yaml`: execution enablement, action allowlist,
   approved target identifiers, required parameters, approval lifetime, duration
   limits, and protected networks.
+- `config/triage.yaml`: pre-analysis suppression exceptions, severity overrides,
+  protected events, and candidate-group limits.
+- `config/windows-authentication-codes.json`: sourced code definitions supplied
+  with authentication evidence; unknown codes remain unresolved.
 
 `protected_networks` is an operator-defined list of CIDRs. Private lab networks
 are not automatically exempt from blocking. An empty list adds no CIDR-based
@@ -252,6 +262,40 @@ Investigation does not authorize or execute response actions. Background workers
 continue to use ordinary analysis until investigation is explicitly integrated.
 
 ## Documentation
+
+### Triage and resource control
+
+`config/triage.yaml` configures pre-analysis decisions. The default retains all
+alerts, enables bounded grouping of matching Windows failed logons, and contains
+no suppression rules. Unknown alerts receive individual analysis. Rules based
+only on a private IP, loopback, or a failed logon are not automatically created.
+
+The API accepts `--triage-config PATH`. Restart the API and worker after updating
+code/configuration. Storage initialization adds audit/group/feedback tables;
+back up the SQLite file before deployment. Existing queued jobs remain scheduled.
+
+```powershell
+python -m cybertriage triage-policy
+python -m cybertriage triage-inspect --record-id ALERT_RECORD_ID
+python -m cybertriage triage-feedback --record-id ALERT_RECORD_ID --analyst ANALYST_ID --label uncertain --reason "Authorization evidence has not yet been retrieved."
+python -m cybertriage triage-release --record-id ALERT_RECORD_ID --analyst ANALYST_ID --reason "Additional investigation requested."
+python -m cybertriage triage-evaluate --output data/evaluations/triage-quality.json
+```
+
+Feedback is append-only. Benign labels do not create suppression rules or cancel
+jobs. Malicious/uncertain labels release previously unscheduled alerts for
+individual analysis. Existing jobs/reports are not overwritten. Operator commands
+require local database access; the analyst argument is audit metadata rather than
+authenticated identity.
+
+Evaluation reports label coverage and per-policy suppression rates; missing
+labels are not treated as benign and zero-denominator rates are null. It measures
+reviewed scheduling decisions rather than comprehensive attack detection accuracy.
+
+See [triage architecture](docs/architecture/triage.md) and the
+[validation guide](docs/validation/triage.md).
+
+### Project documentation
 
 Design decisions, learning notes, experiments, and evaluation results
 will be documented as the project progresses:

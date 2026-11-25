@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "definitions": [
+    {
+      "namespace": "ntstatus", "code": "0xc000006e",
+      "symbol": "STATUS_ACCOUNT_RESTRICTION",
+      "meaning": "An account restriction prevented authentication.",
+      "source_url": "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/596a1078-e883-4972-9bbc-49e60bebca55"
+    },
+    {
+      "namespace": "ntstatus", "code": "0xc0000072",
+      "symbol": "STATUS_ACCOUNT_DISABLED",
+      "meaning": "The referenced account was disabled at the time of the logon attempt.",
+      "source_url": "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/596a1078-e883-4972-9bbc-49e60bebca55"
+    },
+    {
+      "namespace": "logon_type", "code": "2", "symbol": "Interactive",
+      "meaning": "Interactive logon type; this does not establish legitimate intent.",
+      "source_url": "https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4625"
+    },
+    {
+      "namespace": "logon_type", "code": "3", "symbol": "Network",
+      "meaning": "Network logon type; this does not establish malicious intent.",
+      "source_url": "https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4625"
+    },
+    {
+      "namespace": "logon_type", "code": "7", "symbol": "Unlock",
+      "meaning": "Workstation unlock logon type.",
+      "source_url": "https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4625"
+    },
+    {
+      "namespace": "logon_type", "code": "10", "symbol": "RemoteInteractive",
+      "meaning": "Remote interactive logon type.",
+      "source_url": "https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4625"
+    },
+    {
+      "namespace": "logon_type", "code": "11", "symbol": "CachedInteractive",
+      "meaning": "Cached interactive logon type; the domain controller was not contacted for authentication.",
+      "source_url": "https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4625"
+    }
+  ]
+}

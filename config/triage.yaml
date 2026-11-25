@@ -1,0 +1,21 @@
+# Exact-match rules only. No automatic suppression is enabled by default.
+enabled: true
+force_investigate_level: 12
+protected_windows_event_ids: [1102, 4719, 4728, 4732, 4756]
+suppression_rules: []
+
+# Candidate grouping is scoped to manager, agent, rule, event identity,
+# explicit decoded fields, and a fixed event-time window.
+grouping_rules:
+  - id: repeated-windows-logon-failures
+    provider: Microsoft-Windows-Security-Auditing
+    channel: Security
+    event_ids: [4625]
+    fields:
+      - win.eventdata.targetUserName
+      - win.eventdata.targetDomainName
+      - win.eventdata.ipAddress
+      - win.eventdata.logonType
+    window_seconds: 300
+    settle_seconds: 10
+    max_members: 5

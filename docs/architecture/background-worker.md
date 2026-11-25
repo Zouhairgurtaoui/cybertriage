@@ -1,6 +1,10 @@
 # Background investigations
 
-- Ingestion stores an alert and schedules its job in one transaction.
+- Ingestion stores an alert and its triage decision in one transaction.
+- Eligible alerts schedule individual jobs or join a matching pending group.
+- Suppressed alerts remain stored without an automatic job.
+- A grouped job analyzes a consistent snapshot of all retained group members.
+- Group membership stops growing as soon as the representative job is claimed.
 - Workers claim jobs using expiring leases and unique claim tokens.
 - A heartbeat renews the lease during analysis.
 - Report storage, job-result linking, and job completion share one transaction.

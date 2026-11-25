@@ -18,6 +18,13 @@ Implemented code paths:
 - Optional application JSON storage of report text, definitions and references.
 - Response-policy configuration, typed proposals/approvals, and policy preview.
 - IP-block parameter validation, target allowlisting and approval fingerprinting.
+- Authenticated Wazuh ingestion and integrity-checked SQLite alert storage.
+- Leased background jobs with heartbeat, retries, and atomic report completion.
+- Opt-in CLI investigation with a bounded read-only authentication tool.
+- Computed authentication search summaries and sourced status-code definitions.
+- Revisioned pre-analysis triage with retained suppressed alerts and audit history.
+- Bounded candidate groups that share pending jobs and supply full member summaries.
+- Append-only analyst labels, explicit release, and per-policy suppression metrics.
 
 ## What the YAML files actually control
 
@@ -30,6 +37,11 @@ execution enablement, action rules, targets, required parameters, duration,
 protected networks, and approval lifetime. Execution is disabled by default.
 No actual firewall executor is implemented or invoked by the preview.
 
+`triage.yaml` is loaded by ingestion for scheduling decisions. Its revision and
+settings snapshot are retained with the audit trail. The authentication code
+registry is loaded by model/tool composition and stored-alert worker composition;
+it supplies documented definitions without a live network fetch.
+
 ## Report contract
 
 Analysis produces readable text with references and catalogue definitions.
@@ -39,16 +51,20 @@ application data; the model is not required to generate JSON.
 
 ## Remaining backend work
 
-- Wazuh alert normalization and authenticated, size-limited ingestion.
-- Durable alert/report/case storage and idempotency.
-- Time-bounded related-alert lookup with explicit correlation uncertainty.
-- Bounded investigation tools and workflow orchestration.
+- Cross-technique incident/case correlation and Neo4j projection.
+- Background-worker tool-calling integration and additional investigation tools.
+- Live validation of grounding, triage, grouping, and feedback workflows.
 - Authenticated analyst review, stored approvals and audit records.
 - Allowlisted response executors connected to the response policy.
 - API endpoints for the future analyst web application.
 - Deployment configuration and documentation.
 
 The policy foundation does not imply the approval/execution workflow is complete.
+
+The triage policy ships with no active suppression rules. Unknown alerts remain
+eligible for analysis. Existing queue contents are not retroactively filtered.
+Operator CLI actor identifiers are asserted metadata; authenticated analyst
+sessions and authorization are required before exposing review through a web API.
 
 
 

@@ -16,14 +16,21 @@ from cybertriage.domain.alert import (
 )
 
 from cybertriage.domain.security_event import EventIdentity
+from cybertriage.application.policies.alert_triage import AlertTriagePolicy
+from cybertriage.application.ports.triage_policy import AlertTriageDecider
+from cybertriage.domain.triage_policy import TriagePlan, TriageSettings
+from cybertriage.adapters.storage.triage_records import (
+    apply_plan, enqueue_analysis, existing_receipt, initialize_triage_schema, record_decision,
+)
 
 
 class SqliteAlertRepository:
-    def __init__(self, database_path: Path):
+    def __init__(self, database_path: Path, triage_policy: AlertTriageDecider | None = None):
         if str(database_path) == ":memory:":
             raise ValueError("This repository requires a database file.")
 
         self._database_path = database_path
+        self._triage_policy = triage_policy or AlertTriagePolicy(TriageSettings(enabled=False))
 
         try:
             database_path.parent.mkdir(parents=True, exist_ok=True)
@@ -97,6 +104,7 @@ class SqliteAlertRepository:
                             created_at
                         )
                     """)
+                    initialize_triage_schema(connection)
         except (OSError, sqlite3.Error) as error:
             raise AlertStorageError(
                 "Could not initialize alert storage."
@@ -122,28 +130,7 @@ class SqliteAlertRepository:
         connection: sqlite3.Connection,
         record_id: str,
     ) -> None:
-        now = datetime.now(timezone.utc).isoformat()
-
-        connection.execute(
-            """
-            INSERT INTO analysis_jobs (
-                job_id,
-                alert_record_id,
-                status,
-                attempt_count,
-                created_at,
-                available_at
-            )
-            VALUES (?, ?, 'pending', 0, ?, ?)
-            ON CONFLICT (alert_record_id) DO NOTHING
-            """,
-            (
-                uuid4().hex,
-                record_id,
-                now,
-                now,
-            ),
-        )
+        enqueue_analysis(connection, record_id)
 
     def save_and_schedule(
         self,
@@ -177,15 +164,19 @@ class SqliteAlertRepository:
                                 "with different normalized content."
                             )
 
-                        self._enqueue_analysis(
-                            connection,
-                            existing["record_id"],
-                        )
+                        receipt = existing_receipt(connection, existing["record_id"])
+                        if receipt is not None:
+                            return receipt
 
-                        return IngestionReceipt(
-                            record_id=existing["record_id"],
-                            created=False,
-                        )
+                        # Preserve pre-policy jobs; do not retroactively suppress old alerts.
+                        legacy = TriagePlan("investigate", "legacy_delivery", None,
+                                            "legacy-v1", '{"legacy":true}')
+                        record_decision(connection, existing["record_id"], legacy, kind="legacy")
+                        enqueue_analysis(connection, existing["record_id"])
+                        receipt = existing_receipt(connection, existing["record_id"])
+                        if receipt is None:
+                            raise AlertStorageError("Could not reconstruct ingestion receipt.")
+                        return receipt
 
                     record_id = uuid4().hex
                     received_at = datetime.now(timezone.utc).isoformat()
@@ -211,12 +202,8 @@ class SqliteAlertRepository:
                             received_at,
                         ),
                     )
-                    self._enqueue_analysis(connection, record_id)
-
-                    return IngestionReceipt(
-                        record_id=record_id,
-                        created=True,
-                    )
+                    plan = self._triage_policy.decide(alert, at=datetime.now(timezone.utc))
+                    return apply_plan(connection, record_id, plan)
 
         except sqlite3.Error as error:
             raise AlertStorageError(

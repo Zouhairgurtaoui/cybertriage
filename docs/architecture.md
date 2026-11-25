@@ -36,6 +36,12 @@ folders do not represent completed features.
 
 ## Runtime configuration
 
+Ingestion applies a configurable triage policy before scheduling analysis.
+Its decision, optional group membership, and job are persisted with the alert
+in one transaction. Review labels are separate append-only records and never
+become model-generated ground truth. See [alert triage](architecture/triage.md)
+for the scheduling policy, group lifecycle, grounding registry, and evaluation.
+
 `YamlKnowledgeConfiguration` reads `config/sources.yaml` into immutable typed
 settings. Ingestion uses its revision, page list, URLs and chunking values.
 Analysis uses its enabled sources and collection names. Catalogue updates use

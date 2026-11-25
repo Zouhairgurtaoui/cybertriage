@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from cybertriage.application.ports.investigation import (
     AuthenticationEventSearcher,
+    AuthenticationResultGrounder,
 )
 from cybertriage.domain.investigation import (
     AuthenticationSearchRequest,
@@ -80,6 +81,8 @@ def _tool_error(code: str, message: str) -> ToolException:
 
 def build_authentication_search_tool(
     searcher: AuthenticationEventSearcher,
+    *,
+    grounder: AuthenticationResultGrounder,
 ) -> StructuredTool:
     """Adapt the authentication search port to a LangChain tool."""
 
@@ -118,6 +121,7 @@ def build_authentication_search_tool(
             {
                 "status": "success",
                 **asdict(result),
+                "grounding": grounder.ground(result),
             },
             default=_json_default,
             ensure_ascii=True,

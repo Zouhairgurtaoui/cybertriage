@@ -18,9 +18,11 @@ class AlertRepository(Protocol):
         alert: SecurityAlert,
     ) -> IngestionReceipt:
         """
-        Atomically store an alert and ensure its analysis job exists.
+        Atomically store an alert, audit its triage decision, and schedule
+        eligible analysis or attach it to a pending grouped investigation.
 
-        Unchanged duplicate alerts reuse the existing alert and job.
+        Suppressed alerts remain stored without an automatic job.
+        Unchanged duplicates reuse the recorded decision and scheduling result.
         Conflicting content raises AlertConflictError.
         """
         ...

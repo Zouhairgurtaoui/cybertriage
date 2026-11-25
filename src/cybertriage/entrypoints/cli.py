@@ -143,6 +143,7 @@ def _run() -> None:
     )
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8000)
+    serve.add_argument("--triage-config", type=Path, default=Path("config/triage.yaml"))
     serve.add_argument(
         "--database",
         type=Path,
@@ -239,7 +240,62 @@ def _run() -> None:
     authentication.add_argument("--limit", type=int, default=50)
     authentication.add_argument("--output", type=Path)
 
+    for name, help_text in (
+        ("triage-inspect", "Inspect triage history, group members, and analyst feedback."),
+        ("triage-feedback", "Append an analyst label; malicious or uncertain labels release unscheduled alerts."),
+        ("triage-release", "Request individual analysis without changing an analyst label."),
+        ("triage-evaluate", "Evaluate original scheduling decisions against latest analyst labels."),
+    ):
+        review = commands.add_parser(name, help=help_text)
+        review.add_argument("--alerts-database", type=Path, default=Path("data/alerts/alerts.sqlite3"))
+        if name != "triage-evaluate":
+            review.add_argument("--record-id", required=True)
+        if name in ("triage-feedback", "triage-release"):
+            review.add_argument("--analyst", required=True)
+            review.add_argument("--reason", required=True)
+        if name == "triage-feedback":
+            review.add_argument("--label", required=True, choices=["benign", "malicious", "uncertain"])
+        if name == "triage-evaluate":
+            review.add_argument("--output", type=Path)
+
+    triage_policy = commands.add_parser("triage-policy", help="Validate triage configuration and show its revision.")
+    triage_policy.add_argument("--config", type=Path, default=Path("config/triage.yaml"))
+
     args = parser.parse_args()
+
+    if args.command == "triage-policy":
+        import json
+        from cybertriage.adapters.configuration.triage_yaml import YamlTriageConfiguration
+        from cybertriage.application.policies.alert_triage import AlertTriagePolicy
+        settings = YamlTriageConfiguration(args.config).load()
+        policy = AlertTriagePolicy(settings)
+        print(json.dumps({"policy_revision": policy.revision, "enabled": settings.enabled,
+                          "suppression_rule_count": len(settings.suppression_rules),
+                          "grouping_rule_count": len(settings.grouping_rules)}, indent=2))
+        return
+
+    if args.command in ("triage-inspect", "triage-feedback", "triage-release", "triage-evaluate"):
+        import json
+        from cybertriage.bootstrap import build_triage_evaluation, build_triage_review
+        from cybertriage.domain.triage_policy import AnalystFeedback
+
+        if args.command == "triage-evaluate":
+            output = build_triage_evaluation(args.alerts_database.resolve()).execute()
+            if args.output is not None:
+                from cybertriage.adapters.storage.json_files import atomic_write_json
+                atomic_write_json(args.output, output)
+        else:
+            review_service = build_triage_review(args.alerts_database.resolve())
+            if args.command == "triage-inspect":
+                output = dict(review_service.inspect(args.record_id))
+            elif args.command == "triage-feedback":
+                output = dict(review_service.feedback(AnalystFeedback(
+                    args.record_id, args.analyst, args.label, args.reason,
+                )))
+            else:
+                output = dict(review_service.release(args.record_id, args.analyst, args.reason))
+        print(json.dumps(output, indent=2, ensure_ascii=True, allow_nan=False))
+        return
 
     if args.command == "analyze":
         if args.investigate:
@@ -277,6 +333,7 @@ def _run() -> None:
         app = build_ingestion_api(
             database_path=args.database.resolve(),
             token=token,
+            triage_config_path=args.triage_config,
         )
 
         uvicorn.run(

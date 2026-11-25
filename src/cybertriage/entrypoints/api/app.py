@@ -168,6 +168,10 @@ def create_app(
             content={
                 "record_id": receipt.record_id,
                 "created": receipt.created,
+                "triage_action": receipt.triage_action,
+                "triage_decision_id": receipt.triage_decision_id,
+                "group_id": receipt.group_id,
+                "job_id": receipt.job_id,
             },
         )
 

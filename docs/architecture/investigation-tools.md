@@ -55,6 +55,13 @@ String values are preserved without interpretation; resource tokens
 such as %%2310 remain source evidence rather than decoded explanations.
 The CLI includes these fields through dataclass serialization.
 
+The authentication tool also includes an application-generated grounding block:
+the actual search interval and duration, account filters, searched event IDs,
+returned counts, truncation, coverage, and sourced code definitions. Definitions
+are loaded from `config/windows-authentication-codes.json`; unknown values and
+resource tokens remain unresolved. Definition citation IDs use the `D:` prefix.
+This supplies factual context without certifying the model's prose.
+
 Identical source-alert duplicates are collapsed.
 Conflicting duplicates, malformed events, and out-of-scope events
 raise InvestigationSearchError.
@@ -97,8 +104,10 @@ on WS01 through the configured HTTPS connection and reader credentials.
 
 Failure details are included in the query and result mapping. A live failed-logon
 search verified preservation of status_code, substatus_code, and failure_reason.
-The analysis CLI supports opt-in investigation; live tool-calling validation
-and background-worker investigation integration remain pending.
+The analysis CLI supports opt-in investigation. A live model-requested search
+retrieved the expected failed-logon event and saved its execution record.
+Validation of the new grounding block and background-worker tool integration
+remain pending.
 The searches do not independently verify that write operations are denied.
 
 ## Live validation — 2026-11-25
@@ -121,7 +130,9 @@ logon type 2, and a null target logon session ID. Returned has_more: false.
 
 A subsequent search of the same event returned status_code 0xc000006e,
 substatus_code 0xc0000072, and failure_reason %%2310, matching the source fields.
-Live tool-calling validation remains pending.
+The bounded model loop also retrieved this event through a native tool call.
+The resulting prose contained unsupported interpretations, demonstrating that
+successful retrieval does not establish report accuracy.
 Retrieved logons do not independently establish malicious activity.
 ## LangChain authentication tool
 
@@ -185,5 +196,9 @@ The CLI prints tool execution names, statuses, and call IDs. Detailed records
 are included in the JSON report selected with --output. Existing JSON report
 storage serializes these records without a database schema migration.
 
-Background-worker investigation integration and live tool-calling validation
-remain pending. Background workers continue to use ordinary analysis.
+Background-worker tool integration and validation of the new grounding output
+remain pending. Background workers use ordinary analysis with grouped evidence
+and applicable sourced code definitions.
+
+Pre-analysis scheduling, candidate alert grouping, analyst feedback, and
+suppression-quality metrics are documented in [alert triage](triage.md).

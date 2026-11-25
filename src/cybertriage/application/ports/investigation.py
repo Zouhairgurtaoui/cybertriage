@@ -1,4 +1,5 @@
 from typing import Protocol
+from collections.abc import Mapping
 
 from cybertriage.domain.investigation import (
     AuthenticationSearchRequest,
@@ -20,3 +21,7 @@ class AuthenticationEventSearcher(Protocol):
         completed reliably, including partial backend failures.
         """
         ...
+
+
+class AuthenticationResultGrounder(Protocol):
+    def ground(self, result: AuthenticationSearchResult) -> Mapping[str, object]: ...

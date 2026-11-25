@@ -54,6 +54,15 @@ Account names do not establish account type or operator identity.
 Use only supplied reference definitions when explaining event IDs.
 Cite references with [R1], [R2], and the other supplied labels.
 Cite retrieved events using source_instance and source_alert_id.
+Use the tool's computed search_summary for time windows, counts, filters,
+and coverage. The maximum allowed window is not the executed window.
+Use supplied [D:...] definitions for code meanings and cite their IDs.
+If a code or %% resource token has no supplied definition, leave its meaning
+unknown. A general event definition does not define all its status codes.
+No result from this authentication tool establishes whether a lockout event
+exists: only its explicitly listed event IDs were searched.
+Loopback addresses, interactive logon types, and lack of a lockout do not
+establish benign intent or exclude compromise.
 
 Temporal proximity or a shared IP alone does not establish the same actor,
 causation, compromise, or a relationship between incidents.

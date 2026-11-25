@@ -27,6 +27,10 @@ class SecurityAlert:
 class IngestionReceipt:
     record_id: str
     created: bool
+    triage_action: str = "investigate"
+    triage_decision_id: str | None = None
+    group_id: str | None = None
+    job_id: str | None = None
 
 class InvalidAlertError(ValueError):
     """Incoming alert data cannot be normalized."""
