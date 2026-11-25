@@ -45,3 +45,21 @@ These are not a total wall-clock deadline.
 
 Current status: HTTP transport implemented; event mapping,
 connection configuration, live validation, and agent integration pending.
+## Authentication result mapping
+
+The mapper validates event identity, target account, domain,
+and the requested timestamp window.
+
+Results preserve source identifiers and normalize timestamps to UTC.
+Missing optional fields are represented as null.
+
+Identical source-alert duplicates are collapsed.
+Conflicting duplicates, malformed events, and out-of-scope events
+raise InvestigationSearchError.
+
+has_more indicates that the backend returned more matching documents
+than the requested event limit. Duplicate collapsing may reduce
+the number of distinct returned events.
+
+Current status: search adapter implemented;
+connection configuration, CLI, live validation, and agent integration pending.
