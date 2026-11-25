@@ -152,7 +152,7 @@ an action also needs a registered parameter validator and, later, an executor.
 
 See [architecture](docs/architecture.md) for the ports-and-adapters boundaries.
 
-When you choose to evaluate reports manually (CPU inference can take several minutes):
+Generate reports for manual evaluation (CPU inference can take several minutes):
 
 ```powershell
 python -m cybertriage.entrypoints.evaluation --output data/evaluations/latest.json

@@ -91,12 +91,13 @@ Use `python -m cybertriage search-authentication --help` for command usage.
 ## Current status
 
 Shared transport, typed authentication mapping, environment configuration,
-and the CLI are implemented. User-run live searches retrieved both
+and the CLI are implemented. Live searches retrieved both
 successful and failed Windows authentication events for a known account
 on WS01 through the configured HTTPS connection and reader credentials.
 
-Optional failure details are now included in the query and result mapping.
-Live validation of these new fields and agent integration remain pending.
+Failure details are included in the query and result mapping. A live failed-logon
+search verified preservation of status_code, substatus_code, and failure_reason.
+Agent integration remains pending.
 The searches do not independently verify that write operations are denied.
 
 ## Live validation — 2026-11-25
@@ -112,12 +113,12 @@ Verified:
 - Account, domain, event-type, and time filtering for this sample.
 - Typed results with source identifiers and UTC timestamps.
 
-The user also retrieved one matching Windows Security 4625 alert for
+The CLI also retrieved one matching Windows Security 4625 alert for
 the same account on WS01, in the interval 2026-09-01 02:24:50–02:25:00 UTC.
 The result preserved Windows record ID 8873, source IP 127.0.0.1,
 logon type 2, and a null target logon session ID. Returned has_more: false.
 
-This failed-logon validation preceded the addition of failure-detail fields.
-Live validation of status_code, substatus_code, and failure_reason remains
-pending, as does agent integration.
+A subsequent search of the same event returned status_code 0xc000006e,
+substatus_code 0xc0000072, and failure_reason %%2310, matching the source fields.
+Agent integration remains pending.
 Retrieved logons do not independently establish malicious activity.

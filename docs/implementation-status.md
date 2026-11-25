@@ -3,9 +3,8 @@
 ## Current development baseline
 
 The selected local model is `qwen3:4b-instruct`. Thinking is disabled in its
-client configuration. Its readable output is accepted provisionally for
-continuing backend development; accuracy improvements can be revisited later
-with a stronger local model or another model adapter.
+client configuration. Reports are provisional and require analyst review.
+The model port supports alternative model adapters.
 
 Implemented code paths:
 
@@ -31,16 +30,12 @@ execution enablement, action rules, targets, required parameters, duration,
 protected networks, and approval lifetime. Execution is disabled by default.
 No actual firewall executor is implemented or invoked by the preview.
 
-## Simplification decision
+## Report contract
 
-The experimental constrained-JSON analysis path was removed from runtime:
-structured draft classes, quote-copy enforcement, account pseudonyms, lexical
-rejection rules, and automatic repair are no longer used. They added brittleness
-without establishing reliable semantic correctness.
-
-References and catalogue definitions remain. Model prose still requires review;
-there is no claim that the report is mechanically proven accurate. The optional
-JSON report file is application storage, not a required model-output format.
+Analysis produces readable text with references and catalogue definitions.
+Generation checks reject empty or unfinished output. Reports require review
+for factual accuracy and citation relevance. Optional JSON report files store
+application data; the model is not required to generate JSON.
 
 ## Remaining backend work
 
@@ -55,4 +50,12 @@ JSON report file is application storage, not a required model-output format.
 
 The policy foundation does not imply the approval/execution workflow is complete.
 
+<<<<<<< HEAD
 
+=======
+## Evaluation
+
+The report recorder stores generated outputs under ignored `data/evaluations/`.
+Execution completion and semantic review are tracked separately. Review criteria
+and recorder usage are documented in [analysis evaluation](evaluation.md).
+>>>>>>> ab64e2a (clarify project documentation and validation status)

@@ -75,9 +75,9 @@ The CLI disposition flag is only a what-if preview. It creates no review record.
 Firewall executors, persisted approvals, authentication and auditing remain to
 be implemented. The model has no shell or firewall execution capability.
 
-## Verification ownership
+## Analysis validation
 
-The project owner will perform testing. No tests or model runs are executed as
-part of the current coding-only changes. Existing evaluation scripts remain
-available for deliberate manual use, and report generation completion is not
-labelled as semantic validation.
+Generation checks verify that a response is nonempty text and has completed.
+They do not establish factual accuracy, citation relevance, or investigation
+quality. Reports require evaluation against the incident evidence and retrieved
+sources; see [analysis evaluation](evaluation.md).

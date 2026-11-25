@@ -27,7 +27,7 @@ and model output format are separate concerns.
 approved administration, SSH authentication, process activity, an unknown event,
 and untrusted instructions in a log.
 
-Run it only when deliberately choosing to test:
+Generate reports for the evaluation cases:
 
 ```powershell
 python -m cybertriage.entrypoints.evaluation --model qwen3:4b-instruct --output data/evaluations/text-reports.json
@@ -40,9 +40,9 @@ The recorder saves `execution_status` as `completed` or `failed`, and leaves
 `semantic_review` pending. A successful exit means generation completed, not that
 its reasoning or citations are accurate. Interrupted suites are incomplete.
 
-## Historical experiments
+## Evaluation limits
 
-Earlier constrained-JSON experiments rejected some unsupported claims but also
-failed to produce usable responses consistently. Mechanical acceptance did not
-prove citation relevance. That approach was removed from the active analysis
-path to resume backend development with the accepted instruct-model baseline.
+The recorder checks execution and retains reports for semantic review. It does
+not automatically establish factual accuracy, citation relevance, or detection
+coverage. Synthetic cases exercise selected scenarios and do not demonstrate
+performance across all attacks or environments.
