@@ -3,6 +3,7 @@ import sys
 from importlib.metadata import version
 from pathlib import Path
 from datetime import datetime
+from dotenv import load_dotenv
 
 from cybertriage.domain.security_event import EventIdentity
 
@@ -597,12 +598,20 @@ def _run() -> None:
 
 def main() -> None:
     try:
+        load_dotenv(
+            dotenv_path=Path.cwd() / ".env.local",
+            override=False,
+            interpolate=False,
+            encoding="utf-8",
+        )
         _run()
     except KeyboardInterrupt:
         raise SystemExit(130)
     except Exception as error:
-        # Surface transport, input, and generation failures without a partial report.
-        print(f"CyberTriage failed: {type(error).__name__}: {error}", file=sys.stderr)
+        print(
+            f"CyberTriage failed: {type(error).__name__}: {error}",
+            file=sys.stderr,
+        )
         raise SystemExit(1) from None
 
 

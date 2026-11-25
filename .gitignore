@@ -26,3 +26,4 @@ dist/
 # Local virtual environments
 .env/
 .venv/
+/.env.*
