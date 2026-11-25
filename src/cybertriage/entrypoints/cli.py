@@ -2,6 +2,7 @@ import argparse
 import sys
 from importlib.metadata import version
 from pathlib import Path
+from datetime import datetime
 
 from cybertriage.domain.security_event import EventIdentity
 
@@ -206,6 +207,27 @@ def _run() -> None:
     worker.add_argument("--max-attempts", type=int, default=3)
     worker.add_argument("--retry-delay-seconds", type=int, default=30)
     worker.add_argument("--poll-seconds", type=float, default=2.0)
+
+    authentication = commands.add_parser(
+        "search-authentication",
+        help="Search related Windows logon events in Wazuh.",
+    )
+    authentication.add_argument("--account", required=True)
+    authentication.add_argument("--domain", required=True)
+    authentication.add_argument(
+        "--start",
+        required=True,
+        type=datetime.fromisoformat,
+        help="ISO timestamp with timezone.",
+    )
+    authentication.add_argument(
+        "--end",
+        required=True,
+        type=datetime.fromisoformat,
+        help="ISO timestamp with timezone.",
+    )
+    authentication.add_argument("--limit", type=int, default=50)
+    authentication.add_argument("--output", type=Path)
 
     args = parser.parse_args()
 
@@ -442,6 +464,68 @@ def _run() -> None:
             for signum, handler in previous_handlers.items():
                 signal.signal(signum, handler)
 
+        return
+
+    if args.command == "search-authentication":
+        import getpass
+        import json
+        from dataclasses import asdict
+
+        from cybertriage.adapters.storage.json_files import atomic_write_json
+        from cybertriage.bootstrap import build_authentication_search
+        from cybertriage.domain.investigation import AuthenticationSearchRequest
+
+        request = AuthenticationSearchRequest(
+            account_name=args.account,
+            account_domain=args.domain,
+            start=args.start,
+            end=args.end,
+            limit=args.limit,
+        )
+
+        def read_password() -> str:
+            if not sys.stdin.isatty():
+                parser.error(
+                    "Set CYBERTRIAGE_INDEXER_PASSWORD "
+                    "for non-interactive searches."
+                )
+
+            return getpass.getpass("Read-only Indexer password: ")
+
+        searcher = build_authentication_search(
+            password_supplier=read_password,
+        )
+        result = searcher.search(request)
+
+        payload = {
+            "request": {
+                "account_name": result.request.account_name,
+                "account_domain": result.request.account_domain,
+                "start": result.request.start.isoformat(),
+                "end": result.request.end.isoformat(),
+                "limit": result.request.limit,
+            },
+            "searched_at": result.searched_at.isoformat(),
+            "has_more": result.has_more,
+            "coverage": result.coverage,
+            "events": [
+                {
+                    **asdict(event),
+                    "timestamp": event.timestamp.isoformat(),
+                }
+                for event in result.events
+            ],
+        }
+
+        if args.output is not None:
+            atomic_write_json(args.output, payload)
+
+        print(json.dumps(
+            payload,
+            indent=2,
+            ensure_ascii=True,
+            allow_nan=False,
+        ))
         return
 
     evidence = read_evidence(args.evidence)

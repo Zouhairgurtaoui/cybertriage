@@ -196,6 +196,26 @@ the model download size and varies with context and execution settings.
 Sources: [Windows setup](https://docs.ollama.com/windows),
 [model details](https://ollama.com/library/qwen3:4b-instruct).
 
+## Investigation search connection
+
+Set these environment variables in the terminal running CyberTriage:
+
+| Variable | Value |
+|----------|-------|
+| CYBERTRIAGE_INDEXER_URL | HTTPS Indexer origin whose hostname matches its certificate |
+| CYBERTRIAGE_INDEXER_USERNAME | Dedicated read-only Indexer username |
+| CYBERTRIAGE_INDEXER_CA_BUNDLE | Absolute path to the trusted CA bundle |
+| CYBERTRIAGE_INDEXER_PASSWORD | Optional; otherwise the interactive CLI prompts securely |
+
+Environment variables belong to the current process/session.
+The application does not automatically load a .env file.
+
+Inspect command usage with:
+`python -m cybertriage search-authentication --help`
+
+Searches require explicit timezone-aware start and end timestamps.
+Live searches require the Indexer to be reachable.
+
 ## Documentation
 
 Design decisions, learning notes, experiments, and evaluation results

@@ -23,8 +23,12 @@ from cybertriage.application.policies.response_actions import (
     ResponseActionPolicy,
 )
 from cybertriage.application.ports.configuration import (
+    IndexerConfigurationProvider,
     KnowledgeConfigurationProvider,
     ResponseConfigurationProvider,
+)
+from cybertriage.application.ports.investigation import (
+    AuthenticationEventSearcher,
 )
 from cybertriage.application.ports.knowledge import KnowledgeSource
 from cybertriage.application.use_cases.analyze_alert import AnalyzeAlert
@@ -289,4 +293,42 @@ def build_analysis_worker(
         max_attempts=max_attempts,
         retry_delay_seconds=retry_delay_seconds,
         poll_seconds=poll_seconds,
+    )
+
+def build_authentication_search(
+    configuration: IndexerConfigurationProvider | None = None,
+    password_supplier: Callable[[], str] | None = None,
+) -> AuthenticationEventSearcher:
+    from cybertriage.adapters.configuration.indexer_environment import (
+        EnvironmentIndexerConfiguration,
+    )
+    from cybertriage.adapters.wazuh.authentication_search import (
+        WazuhAuthenticationEventSearcher,
+    )
+    from cybertriage.adapters.wazuh.indexer_http import (
+        WazuhIndexerHttpClient,
+    )
+
+    provider = (
+        configuration
+        if configuration is not None
+        else EnvironmentIndexerConfiguration()
+    )
+    settings = provider.load()
+
+    password = os.environ.get("CYBERTRIAGE_INDEXER_PASSWORD")
+
+    if not password and password_supplier is not None:
+        password = password_supplier()
+
+    if not isinstance(password, str) or not 1 <= len(password) <= 1024:
+        raise ValueError("A valid Indexer password is required.")
+
+    return WazuhAuthenticationEventSearcher(
+        client=WazuhIndexerHttpClient(
+            base_url=settings.base_url,
+            username=settings.username,
+            password=password,
+            ca_bundle=settings.ca_bundle,
+        )
     )

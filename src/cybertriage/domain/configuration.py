@@ -1,6 +1,7 @@
 """Typed configuration values, independent of YAML and concrete clients."""
 
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -31,3 +32,9 @@ class KnowledgeSettings:
     catalog_url: str
     chunk_size: int
     chunk_overlap: int
+
+@dataclass(frozen=True)
+class IndexerSettings:
+    base_url: str
+    username: str
+    ca_bundle: Path
