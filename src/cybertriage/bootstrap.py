@@ -164,3 +164,32 @@ def build_response_preview(
         validators={"block_ip": BlockIpParameterValidator()},
     )
     return PreviewResponseAction(policy)
+
+def build_alert_ingestion(database_path: Path):
+    from cybertriage.adapters.storage.alerts_sqlite import (
+        SqliteAlertRepository,
+    )
+    from cybertriage.adapters.wazuh.normalizer import (
+        WazuhAlertNormalizer,
+    )
+    from cybertriage.application.use_cases.ingest_alert import (
+        IngestAlert,
+    )
+
+    return IngestAlert(
+        normalizer=WazuhAlertNormalizer(),
+        repository=SqliteAlertRepository(database_path),
+    )
+
+def build_ingestion_api(
+    database_path: Path,
+    token: str,
+):
+    from cybertriage.entrypoints.api.app import create_app
+
+    ingestion = build_alert_ingestion(database_path)
+
+    return create_app(
+        ingestion=ingestion,
+        token=token,
+    )
