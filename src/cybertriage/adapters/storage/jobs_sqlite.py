@@ -235,6 +235,7 @@ class SqliteAnalysisQueue:
         *,
         lease_seconds: int = 600,
         max_attempts: int = 3,
+        job_id: str | None = None,
     ) -> ClaimedAnalysisJob | None:
         if type(lease_seconds) is not int or not 1 <= lease_seconds <= 86400:
             raise ValueError(
@@ -243,6 +244,11 @@ class SqliteAnalysisQueue:
 
         if type(max_attempts) is not int or max_attempts < 1:
             raise ValueError("max_attempts must be a positive integer.")
+
+        if job_id is not None and (
+            not isinstance(job_id, str) or not job_id.strip()
+        ):
+            raise ValueError("job_id must be a non-empty string.")
 
         try:
             with closing(self._connect()) as connection:
@@ -282,12 +288,15 @@ class SqliteAnalysisQueue:
                                   AND lease_expires_at <= ?
                               )
                           )
+                          AND (? IS NULL OR job_id = ?)
                         """,
                         (
                             now_text,
                             max_attempts,
                             now_text,
                             now_text,
+                            job_id,
+                            job_id,
                         ),
                     )
 
@@ -307,6 +316,7 @@ class SqliteAnalysisQueue:
                                   AND lease_expires_at <= ?
                               )
                           )
+                          AND (? IS NULL OR job_id = ?)
                         ORDER BY created_at, job_id
                         LIMIT 1
                         """,
@@ -314,6 +324,8 @@ class SqliteAnalysisQueue:
                             max_attempts,
                             now_text,
                             now_text,
+                            job_id,
+                            job_id,
                         ),
                     ).fetchone()
 

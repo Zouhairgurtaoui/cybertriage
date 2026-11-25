@@ -10,6 +10,7 @@ class JobClaimer(Protocol):
         *,
         lease_seconds: int = 600,
         max_attempts: int = 3,
+        job_id: str | None = None,
     ) -> ClaimedAnalysisJob | None:
         """
         Reserve one eligible job atomically.

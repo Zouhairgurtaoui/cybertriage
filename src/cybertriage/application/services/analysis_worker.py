@@ -67,7 +67,16 @@ class AnalysisWorker:
         self._retry_delay_seconds = retry_delay_seconds
         self._poll_seconds = poll_seconds
 
-    def run(self, stop: Event, *, once: bool = False) -> None:
+    def run(
+        self,
+        stop: Event,
+        *,
+        once: bool = False,
+        job_id: str | None = None,
+    ) -> None:
+        if job_id is not None and not once:
+            raise ValueError("Targeted processing requires once=True.")
+
         logger.info("Analysis worker started")
 
         while not stop.is_set():
@@ -75,6 +84,7 @@ class AnalysisWorker:
                 job = self._claimer.claim_next(
                     lease_seconds=self._lease_seconds,
                     max_attempts=self._max_attempts,
+                    job_id=job_id,
                 )
 
             except JobStorageError:

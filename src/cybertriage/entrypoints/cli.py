@@ -198,6 +198,10 @@ def _run() -> None:
     )
     worker.add_argument("--model")
     worker.add_argument("--once", action="store_true")
+    worker.add_argument(
+        "--job-id",
+        help="Process one specific eligible job; requires --once.",
+    )
     worker.add_argument("--lease-seconds", type=int, default=600)
     worker.add_argument("--max-attempts", type=int, default=3)
     worker.add_argument("--retry-delay-seconds", type=int, default=30)
@@ -391,6 +395,9 @@ def _run() -> None:
 
         from cybertriage.bootstrap import build_analysis_worker
 
+        if args.job_id is not None and not args.once:
+            parser.error("--job-id requires --once.")
+
         logging.basicConfig(
             level=logging.INFO,
             format="%(asctime)s %(levelname)s %(message)s",
@@ -425,7 +432,11 @@ def _run() -> None:
                     request_stop,
                 )
 
-            service.run(stop, once=args.once)
+            service.run(
+                stop,
+                once=args.once,
+                job_id=args.job_id,
+            )
 
         finally:
             for signum, handler in previous_handlers.items():
