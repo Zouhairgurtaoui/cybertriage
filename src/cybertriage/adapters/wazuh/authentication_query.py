@@ -1,18 +1,5 @@
+from cybertriage.adapters.wazuh.json_types import JsonValue
 from cybertriage.domain.investigation import AuthenticationSearchRequest
-from collections.abc import Mapping, Sequence
-from typing import TypeAlias
-
-
-JsonValue: TypeAlias = (
-    str
-    | int
-    | float
-    | bool
-    | None
-    | Sequence["JsonValue"]
-    | Mapping[str, "JsonValue"]
-)
-
 
 SOURCE_FIELDS = (
     "id",

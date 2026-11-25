@@ -1,6 +1,9 @@
 from cybertriage.adapters.wazuh.authentication_mapping import (
     parse_authentication_response,
 )
+from cybertriage.adapters.wazuh.authentication_query import (
+    build_authentication_query,
+)
 from cybertriage.adapters.wazuh.indexer_http import WazuhIndexerHttpClient
 from cybertriage.domain.investigation import (
     AuthenticationSearchRequest,
@@ -16,7 +19,10 @@ class WazuhAuthenticationEventSearcher:
         self,
         request: AuthenticationSearchRequest,
     ) -> AuthenticationSearchResult:
-        payload = self._client.search_authentication(request)
+        payload = self._client.search_alerts(
+            query=build_authentication_query(request),
+            max_hits=request.limit + 1,
+        )
 
         return parse_authentication_response(
             payload=payload,

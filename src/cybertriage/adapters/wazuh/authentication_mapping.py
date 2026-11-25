@@ -82,13 +82,15 @@ def _parse_hit(
     if type(raw_event_id) is int:
         raw_event_id = str(raw_event_id)
 
-    if raw_event_id not in ("4624", "4625"):
+    event_id_text = _text(raw_event_id, "eventID", limit=4)
+
+    if event_id_text not in ("4624", "4625"):
         raise ValueError("Unexpected authentication event ID.")
 
     event = EventIdentity(
         provider=_text(system.get("providerName"), "providerName"),
         channel=_text(system.get("channel"), "channel"),
-        event_id=int(raw_event_id),
+        event_id=int(event_id_text),
     )
 
     if (

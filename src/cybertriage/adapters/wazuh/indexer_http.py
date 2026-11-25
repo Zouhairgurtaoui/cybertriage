@@ -1,17 +1,13 @@
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from urllib.parse import urlsplit
 
 import requests
 from requests.auth import HTTPBasicAuth
 
-from cybertriage.adapters.wazuh.authentication_query import (
-    build_authentication_query,
-)
-from cybertriage.domain.investigation import (
-    AuthenticationSearchRequest,
-    InvestigationSearchError,
-)
+from cybertriage.adapters.wazuh.json_types import JsonValue
+from cybertriage.domain.investigation import InvestigationSearchError
 
 
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
@@ -34,9 +30,16 @@ def _reject_constant(value: str) -> None:
     raise ValueError("Nonstandard JSON constant.")
 
 
+def _nonnegative_integer(value: object, path: str) -> int:
+    if type(value) is not int or value < 0:
+        raise ValueError(f"{path} must be a nonnegative integer.")
+
+    return value
+
+
 def _validate_response(
     payload: object,
-    request: AuthenticationSearchRequest,
+    max_hits: int,
 ) -> dict[str, object]:
     if not isinstance(payload, dict):
         raise ValueError("Expected a JSON object.")
@@ -52,16 +55,11 @@ def _validate_response(
     if not isinstance(shards, dict):
         raise ValueError("Missing shard information.")
 
-    counts = [
-        shards.get("total"),
-        shards.get("successful"),
-        shards.get("failed"),
-    ]
-
-    if any(type(value) is not int or value < 0 for value in counts):
-        raise ValueError("Invalid shard information.")
-
-    total, successful, failed = counts
+    total = _nonnegative_integer(shards.get("total"), "_shards.total")
+    successful = _nonnegative_integer(
+        shards.get("successful"), "_shards.successful"
+    )
+    failed = _nonnegative_integer(shards.get("failed"), "_shards.failed")
 
     if total == 0 or successful != total or failed != 0:
         raise ValueError("Search did not complete across all shards.")
@@ -76,7 +74,7 @@ def _validate_response(
     if not isinstance(documents, list):
         raise ValueError("Invalid search results.")
 
-    if len(documents) > request.limit + 1:
+    if len(documents) > max_hits:
         raise ValueError("Search exceeded the requested result count.")
 
     return payload
@@ -139,10 +137,20 @@ class WazuhIndexerHttpClient:
         self._auth = HTTPBasicAuth(username, password)
         self._ca_bundle = str(ca_bundle.resolve())
 
-    def search_authentication(
+    def search_alerts(
         self,
-        request: AuthenticationSearchRequest,
+        query: Mapping[str, JsonValue],
+        *,
+        max_hits: int,
     ) -> dict[str, object]:
+        if type(max_hits) is not int or not 1 <= max_hits <= 101:
+            raise ValueError("max_hits must be an integer from 1 to 101.")
+
+        size = query.get("size")
+
+        if type(size) is not int or size != max_hits:
+            raise ValueError("Query size must match max_hits.")
+
         try:
             with requests.Session() as session:
                 # Use the explicitly configured credentials, CA, and endpoint.
@@ -156,7 +164,7 @@ class WazuhIndexerHttpClient:
                         "allow_no_indices": "false",
                         "ignore_unavailable": "false",
                     },
-                    json=build_authentication_query(request),
+                    json=dict(query),
                     headers={
                         "Accept": "application/json",
                         "Accept-Encoding": "identity",
@@ -226,7 +234,7 @@ class WazuhIndexerHttpClient:
                 parse_constant=_reject_constant,
             )
 
-            return _validate_response(payload, request)
+            return _validate_response(payload, max_hits)
 
         except requests.exceptions.SSLError:
             raise InvestigationSearchError(
