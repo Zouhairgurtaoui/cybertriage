@@ -1,4 +1,17 @@
 from cybertriage.domain.investigation import AuthenticationSearchRequest
+from collections.abc import Mapping, Sequence
+from typing import TypeAlias
+
+
+JsonValue: TypeAlias = (
+    str
+    | int
+    | float
+    | bool
+    | None
+    | Sequence["JsonValue"]
+    | Mapping[str, "JsonValue"]
+)
 
 
 SOURCE_FIELDS = (
@@ -22,7 +35,7 @@ SOURCE_FIELDS = (
 
 def build_authentication_query(
     request: AuthenticationSearchRequest,
-) -> dict[str, object]:
+) -> dict[str, JsonValue]:
     return {
         # Fetch one extra event to detect omitted results.
         "size": request.limit + 1,
