@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from cybertriage.domain.security_event import SecurityEventDefinition
 from datetime import datetime
 
+from cybertriage.domain.agent import ToolExecution
+
 
 @dataclass(frozen=True)
 class RetrievedReference:
@@ -17,6 +19,7 @@ class TriageResult:
     analysis: str
     references: tuple[RetrievedReference, ...]
     event_definition: SecurityEventDefinition | None = None
+    tool_executions: tuple[ToolExecution, ...] = ()
 
 @dataclass(frozen=True)
 class AnalysisRecord:

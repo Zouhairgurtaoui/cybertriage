@@ -67,6 +67,11 @@ def _run() -> None:
         type=Path,
         default=Path("data/catalogs/windows-security.json"),
     )
+    analyze.add_argument(
+        "--investigate",
+        action="store_true",
+        help="Enable bounded read-only investigation tool calls.",
+    )
     ingest = commands.add_parser(
         "ingest",
         help="Fetch, chunk, and store reference knowledge.",
@@ -549,11 +554,28 @@ def _run() -> None:
 
     from cybertriage.bootstrap import build_analyze_alert
 
+    def read_investigation_password() -> str:
+        import getpass
+
+        if not sys.stdin.isatty():
+            parser.error(
+                "Set CYBERTRIAGE_INDEXER_PASSWORD "
+                "for non-interactive investigation."
+            )
+
+        return getpass.getpass("Read-only Indexer password: ")
+
     use_case = build_analyze_alert(
         database_directory=args.database.resolve(),
         catalog_path=args.catalog.resolve() if event is not None else None,
         model_name=args.model,
         sources_config_path=args.sources_config,
+        investigate=args.investigate,
+        password_supplier=(
+            read_investigation_password
+            if args.investigate
+            else None
+        ),
     )
 
     print("Retrieving references and analysing evidence...", file=sys.stderr)
@@ -583,6 +605,19 @@ def _run() -> None:
         print()
     print("Model analysis (provisional; analyst review required):")
     print(result.analysis)
+
+    if args.investigate:
+        print("\nInvestigation tool activity:")
+
+        if not result.tool_executions:
+            print("No tools were requested by the model.")
+
+        for execution in result.tool_executions:
+            print(
+                f"- {execution.tool_name}: {execution.status} "
+                f"(call ID: {execution.call_id})"
+            )
+
     print("\nRetrieved references:")
 
     if not result.references:

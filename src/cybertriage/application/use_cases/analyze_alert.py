@@ -6,6 +6,9 @@ from cybertriage.application.ports.triage import (
 from cybertriage.domain.security_event import EventIdentity
 from cybertriage.domain.triage import RetrievedReference, TriageResult
 
+from cybertriage.application.ports.agent import InvestigationModel
+from cybertriage.domain.agent import ToolExecution
+
 
 class AnalyzeAlert:
     def __init__(
@@ -14,6 +17,8 @@ class AnalyzeAlert:
         model: TriageModel,
         retrieval_limit: int = 3,
         catalog: SecurityEventCatalog | None = None,
+        *,
+        investigator: InvestigationModel | None = None,
     ):
         if not 1 <= retrieval_limit <= 20:
             raise ValueError("retrieval_limit must be between 1 and 20.")
@@ -22,7 +27,10 @@ class AnalyzeAlert:
         self._model = model
         self._retrieval_limit = retrieval_limit
         self._catalog = catalog
+        self._investigator = investigator
 
+    
+    #
     def execute(
         self,
         evidence: str,
@@ -106,16 +114,29 @@ class AnalyzeAlert:
                 f"{evidence}"
             )
 
-        analysis = self._model.analyze(
-            evidence=model_evidence,
-            references=reference_tuple,
-        )
+        tool_executions: tuple[ToolExecution, ...] = ()
+
+        if self._investigator is None:
+            analysis = self._model.analyze(
+                evidence=model_evidence,
+                references=reference_tuple,
+            )
+        else:
+            investigation = self._investigator.investigate(
+                evidence=model_evidence,
+                references=reference_tuple,
+            )
+            analysis = investigation.analysis
+            tool_executions = investigation.tool_executions
 
         if not isinstance(analysis, str) or not analysis.strip():
-            raise RuntimeError("The model returned an empty or non-text report.")
+            raise RuntimeError(
+                "The model returned an empty or non-text report."
+            )
 
         return TriageResult(
             analysis=analysis.strip(),
             references=reference_tuple,
             event_definition=definition,
+            tool_executions=tool_executions,
         )

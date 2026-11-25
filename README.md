@@ -57,8 +57,11 @@ thinking disabled in the client configuration.
 
 Knowledge ingestion and retrieval read `config/sources.yaml`. Response eligibility
 reads `config/response_actions.yaml` through a separate application policy.
-There is no firewall executor or approval-storage workflow yet. The Wazuh
-receiver, investigation tools, API, and deployment integration remain planned. See
+Authenticated Wazuh ingestion, SQLite-backed background analysis, and a read-only
+authentication search are implemented. The analysis CLI supports opt-in model
+tool calling. There is no firewall executor or approval-storage workflow yet.
+Background-worker investigation tools and the analyst web application remain
+planned. See
 [implementation status](docs/implementation-status.md).
 
 ## Install the Python Application
@@ -207,14 +210,41 @@ Set these environment variables in the terminal running CyberTriage:
 | CYBERTRIAGE_INDEXER_CA_BUNDLE | Absolute path to the trusted CA bundle |
 | CYBERTRIAGE_INDEXER_PASSWORD | Optional; otherwise the interactive CLI prompts securely |
 
-Environment variables belong to the current process/session.
-The application does not automatically load a .env file.
+The CLI loads optional local configuration from `.env.local` in the current
+working directory. Existing environment variables take precedence. Variable
+interpolation is disabled so password values are not expanded.
+
+Store local credentials in this ignored file; do not commit passwords.
+`.env.example` may contain placeholders for sharing configuration structure.
 
 Inspect command usage with:
 `python -m cybertriage search-authentication --help`
 
 Searches require explicit timezone-aware start and end timestamps.
 Live searches require the Indexer to be reachable.
+
+## Read-only investigation
+
+Add `--investigate` to `analyze` to enable bounded authentication searches.
+The command requires the configured Indexer connection and credentials,
+populated knowledge collections, and the configured models available in Ollama.
+
+Evidence or analyst instructions must supply the account, domain, and
+timezone-aware investigation window. The model may request up to two tools.
+Saved JSON reports include tool execution records. The CLI displays each
+recorded tool's name, status, and call ID.
+
+```powershell
+python -m cybertriage analyze --evidence examples/alerts/authentication-investigation.txt --event-id 4625 --provider Microsoft-Windows-Security-Auditing --channel Security --investigate --output data/reports/authentication-investigation.json
+```
+
+The example contains a recorded failed-logon event and an explicit analyst
+search request. Inspect `tool_executions` in the saved report to distinguish
+successful searches from errors or a run without tool calls. A completed report
+does not by itself verify successful evidence retrieval.
+
+Investigation does not authorize or execute response actions. Background workers
+continue to use ordinary analysis until investigation is explicitly integrated.
 
 ## Documentation
 

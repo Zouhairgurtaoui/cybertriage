@@ -39,6 +39,7 @@ from cybertriage.application.use_cases.analyze_stored_alert import (
     AnalyzeStoredAlert,
 )
 
+from cybertriage.application.ports.agent import InvestigationModel
 
 DEFAULT_SOURCES_CONFIG = Path("config/sources.yaml")
 DEFAULT_RESPONSE_CONFIG = Path("config/response_actions.yaml")
@@ -78,15 +79,30 @@ def build_analyze_alert(
     model_name: str | None = None,
     sources_config_path: Path = DEFAULT_SOURCES_CONFIG,
     configuration: KnowledgeConfigurationProvider | None = None,
+    *,
+    investigate: bool = False,
+    password_supplier: Callable[[], str] | None = None,
 ) -> AnalyzeAlert:
     settings = _load_knowledge(sources_config_path, configuration)
-    if not database_directory.is_dir():
-        raise FileNotFoundError(f"Knowledge database directory not found: {database_directory}")
 
-    collections = [name for enabled, name, _ in _source_bindings(settings).values() if enabled]
+    if not database_directory.is_dir():
+        raise FileNotFoundError(
+            f"Knowledge database directory not found: {database_directory}"
+        )
+
+    collections = [
+        name
+        for enabled, name, _ in _source_bindings(settings).values()
+        if enabled
+    ]
+
     if not collections:
-        raise ValueError("Enable at least one knowledge source in sources.yaml.")
+        raise ValueError(
+            "Enable at least one knowledge source in sources.yaml."
+        )
+
     embeddings = RunbookEmbeddings()
+
     retriever = FederatedKnowledgeRetriever(tuple(
         ChromaKnowledgeIndex(
             directory=database_directory,
@@ -96,18 +112,54 @@ def build_analyze_alert(
         )
         for name in collections
     ))
-    model = OllamaTriageModel(ChatOllama(
-        model=model_name or os.environ.get("CYBERTRIAGE_MODEL", "qwen3:4b-instruct"),
+
+    ollama = ChatOllama(
+        model=model_name or os.environ.get(
+            "CYBERTRIAGE_MODEL",
+            "qwen3:4b-instruct",
+        ),
         base_url="http://localhost:11434",
         temperature=0,
         num_ctx=8192,
         num_predict=800,
         reasoning=False,
         client_kwargs={"timeout": 180.0},
-    ))
-    catalog = load_event_catalog(catalog_path) if catalog_path is not None else None
-    return AnalyzeAlert(retriever=retriever, model=model, retrieval_limit=3, catalog=catalog)
+    )
 
+    investigator: InvestigationModel | None = None
+
+    if investigate:
+        from cybertriage.adapters.models.investigation import (
+            OllamaInvestigationModel,
+        )
+        from cybertriage.adapters.tools.authentication import (
+            build_authentication_search_tool,
+        )
+
+        searcher = build_authentication_search(
+            password_supplier=password_supplier,
+        )
+
+        investigator = OllamaInvestigationModel(
+            model=ollama,
+            tools=[
+                build_authentication_search_tool(searcher),
+            ],
+        )
+
+    catalog = (
+        load_event_catalog(catalog_path)
+        if catalog_path is not None
+        else None
+    )
+
+    return AnalyzeAlert(
+        retriever=retriever,
+        model=OllamaTriageModel(ollama),
+        retrieval_limit=3,
+        catalog=catalog,
+        investigator=investigator,
+    )
 
 def build_knowledge_ingestion(
     source_name: str,

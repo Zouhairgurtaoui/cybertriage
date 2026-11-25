@@ -1,0 +1,15 @@
+Observed evidence:
+- Windows Security event 4625 was recorded on WS01.
+- Timestamp: 2026-09-01T02:24:57.061Z.
+- Target account: CORP\zguertaoui.
+- Windows event record ID: 8873.
+- Source IP: 127.0.0.1.
+- Logon type: 2.
+
+Analyst investigation request:
+Use search_authentication to retrieve authentication events for account
+zguertaoui in domain CORP from 2026-09-01T02:24:50Z inclusive to
+2026-09-01T02:25:00Z exclusive, with a limit of 5.
+
+Use the returned evidence to explain the failed logon.
+Distinguish reported facts from hypotheses and remaining unknowns.

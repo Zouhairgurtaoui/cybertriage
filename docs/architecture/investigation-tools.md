@@ -97,7 +97,8 @@ on WS01 through the configured HTTPS connection and reader credentials.
 
 Failure details are included in the query and result mapping. A live failed-logon
 search verified preservation of status_code, substatus_code, and failure_reason.
-Agent integration remains pending.
+The analysis CLI supports opt-in investigation; live tool-calling validation
+and background-worker investigation integration remain pending.
 The searches do not independently verify that write operations are denied.
 
 ## Live validation — 2026-11-25
@@ -120,7 +121,7 @@ logon type 2, and a null target logon session ID. Returned has_more: false.
 
 A subsequent search of the same event returned status_code 0xc000006e,
 substatus_code 0xc0000072, and failure_reason %%2310, matching the source fields.
-Agent integration remains pending.
+Live tool-calling validation remains pending.
 Retrieved logons do not independently establish malicious activity.
 ## LangChain authentication tool
 
@@ -154,4 +155,22 @@ The result contains report text and structured tool execution records.
 Conversation size is bounded by a serialized-byte limit, which does not
 represent an exact token count.
 
-CLI, background-worker integration, and live model validation remain pending.
+## Analysis integration
+
+`analyze --investigate` enables the bounded investigation model.
+Without this flag, analysis uses the ordinary triage model.
+
+Knowledge retrieval and event catalogue lookup run before model analysis.
+The composition root registers the authentication search tool and provides
+its configured Indexer client.
+
+Saved results include tool_executions alongside report text and references.
+Each execution records its call ID, tool name, arguments, result, and status.
+An empty execution list means no tool calls were recorded.
+
+The CLI prints tool execution names, statuses, and call IDs. Detailed records
+are included in the JSON report selected with --output. Existing JSON report
+storage serializes these records without a database schema migration.
+
+Background-worker investigation integration and live tool-calling validation
+remain pending. Background workers continue to use ordinary analysis.
