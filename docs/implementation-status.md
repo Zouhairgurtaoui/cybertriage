@@ -50,12 +50,11 @@ application data; the model is not required to generate JSON.
 
 The policy foundation does not imply the approval/execution workflow is complete.
 
-<<<<<<< HEAD
 
-=======
+
 ## Evaluation
 
 The report recorder stores generated outputs under ignored `data/evaluations/`.
 Execution completion and semantic review are tracked separately. Review criteria
 and recorder usage are documented in [analysis evaluation](evaluation.md).
->>>>>>> ab64e2a (clarify project documentation and validation status)
+
