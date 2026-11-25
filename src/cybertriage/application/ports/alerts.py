@@ -13,15 +13,19 @@ class AlertNormalizer(Protocol):
 
 
 class AlertRepository(Protocol):
-    def save_if_new(
+    def save_and_schedule(
         self,
         alert: SecurityAlert,
     ) -> IngestionReceipt:
         """
-        Save an alert atomically.
+        Atomically store an alert and ensure its analysis job exists.
 
-        Identify duplicates by source_instance and source_alert_id.
-        Return the existing receipt when the content is unchanged.
-        Raise AlertConflictError when the identity matches but content differs.
+        Unchanged duplicate alerts reuse the existing alert and job.
+        Conflicting content raises AlertConflictError.
         """
+        ...
+
+class AlertReader(Protocol):
+    def get(self, record_id: str) -> SecurityAlert | None:
+        """Return a stored alert, or None when it does not exist."""
         ...

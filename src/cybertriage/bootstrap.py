@@ -30,6 +30,9 @@ from cybertriage.application.use_cases.analyze_alert import AnalyzeAlert
 from cybertriage.application.use_cases.ingest_knowledge import IngestKnowledge
 from cybertriage.application.use_cases.preview_response_action import PreviewResponseAction
 from cybertriage.domain.configuration import KnowledgeSettings
+from cybertriage.application.use_cases.analyze_stored_alert import (
+    AnalyzeStoredAlert,
+)
 
 
 DEFAULT_SOURCES_CONFIG = Path("config/sources.yaml")
@@ -192,4 +195,37 @@ def build_ingestion_api(
     return create_app(
         ingestion=ingestion,
         token=token,
+    )
+
+def build_analyze_stored_alert(
+    alerts_database_path: Path,
+    database_directory: Path,
+    catalog_path: Path,
+    model_name: str | None = None,
+    sources_config_path: Path = DEFAULT_SOURCES_CONFIG,
+) -> AnalyzeStoredAlert:
+    from cybertriage.adapters.storage.alerts_sqlite import (
+        SqliteAlertRepository,
+    )
+    from cybertriage.adapters.storage.analyses_sqlite import (
+        SqliteAnalysisWriter,
+    )
+
+    if not alerts_database_path.is_file():
+        raise FileNotFoundError(
+            f"Alert database not found: {alerts_database_path}"
+        )
+
+    reader = SqliteAlertRepository(alerts_database_path)
+    writer = SqliteAnalysisWriter(alerts_database_path)
+
+    return AnalyzeStoredAlert(
+        reader=reader,
+        analyzer=build_analyze_alert(
+            database_directory=database_directory,
+            catalog_path=catalog_path,
+            model_name=model_name,
+            sources_config_path=sources_config_path,
+        ),
+        writer=writer,
     )

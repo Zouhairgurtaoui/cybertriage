@@ -21,4 +21,4 @@ class IngestAlert:
         payload: Mapping[str, object],
     ) -> IngestionReceipt:
         alert = self._normalizer.normalize(payload)
-        return self._repository.save_if_new(alert)
+        return self._repository.save_and_schedule(alert)

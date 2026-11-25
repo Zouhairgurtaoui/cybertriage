@@ -38,3 +38,6 @@ class AlertConflictError(ValueError):
 
 class AlertStorageError(RuntimeError):
     """An alert could not be persisted."""
+
+class AlertNotFoundError(LookupError):
+    """The requested stored alert does not exist."""

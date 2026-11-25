@@ -126,7 +126,90 @@ def _run() -> None:
         default=Path("data/catalogs/windows-security.json"),
     )
 
+    serve = commands.add_parser(
+        "serve",
+        help="Run the authenticated Wazuh ingestion API.",
+    )
+    serve.add_argument("--host", default="127.0.0.1")
+    serve.add_argument("--port", type=int, default=8000)
+    serve.add_argument(
+        "--database",
+        type=Path,
+        default=Path("data/alerts/alerts.sqlite3"),
+    )
+    serve.add_argument(
+        "--max-connections",
+        type=int,
+        default=16,
+    )
+
+    stored = commands.add_parser(
+        "analyze-stored",
+        help="Investigate a received alert stored in SQLite.",
+    )
+    stored.add_argument("--record-id", required=True)
+    stored.add_argument("--query")
+    stored.add_argument("--model")
+    stored.add_argument("--output", type=Path)
+    stored.add_argument(
+        "--alerts-database",
+        type=Path,
+        default=Path("data/alerts/alerts.sqlite3"),
+    )
+    stored.add_argument(
+        "--database",
+        type=Path,
+        default=Path("data/chroma"),
+    )
+    stored.add_argument(
+        "--catalog",
+        type=Path,
+        default=Path("data/catalogs/windows-security.json"),
+    )
+    stored.add_argument(
+        "--sources-config",
+        type=Path,
+        default=Path("config/sources.yaml"),
+    )
+
     args = parser.parse_args()
+
+    if args.command == "serve":
+        import os
+
+        if not 1 <= args.port <= 65535:
+            parser.error("--port must be between 1 and 65535.")
+
+        if args.max_connections <= 0:
+            parser.error("--max-connections must be positive.")
+
+        token = os.environ.get("CYBERTRIAGE_INGEST_TOKEN")
+
+        if not token:
+
+            parser.error(
+                "Set the CYBERTRIAGE_INGEST_TOKEN environment variable "
+                "before starting the ingestion API."
+            )
+
+        import uvicorn
+
+        from cybertriage.bootstrap import build_ingestion_api
+
+        app = build_ingestion_api(
+            database_path=args.database.resolve(),
+            token=token,
+        )
+
+        uvicorn.run(
+            app,
+            host=args.host,
+            port=args.port,
+            workers=1,
+            limit_concurrency=args.max_connections,
+            proxy_headers=False,
+        )
+        return
 
     if args.command == "response-policy":
         import json
@@ -218,6 +301,57 @@ def _run() -> None:
         print(f"Documents: {result.documents}")
         print(f"Chunks: {result.chunks}")
         print(f"New chunks stored: {result.added}")
+        return
+
+    if args.command == "analyze-stored":
+        from dataclasses import asdict
+
+        from cybertriage.adapters.storage.json_files import (
+            atomic_write_json,
+        )
+        from cybertriage.bootstrap import build_analyze_stored_alert
+
+        use_case = build_analyze_stored_alert(
+            alerts_database_path=args.alerts_database.resolve(),
+            database_directory=args.database.resolve(),
+            catalog_path=args.catalog.resolve(),
+            model_name=args.model,
+            sources_config_path=args.sources_config,
+        )
+
+        print(
+            "Retrieving references and analysing the stored alert...",
+            file=sys.stderr,
+        )
+
+        record = use_case.execute(
+            record_id=args.record_id,
+            retrieval_query=args.query,
+        )
+        result = record.result
+
+        print(f"Analysis ID: {record.analysis_id}")
+        print(f"Alert ID: {record.alert_record_id}")
+        print(f"Completed at: {record.completed_at.isoformat()}")
+
+        if args.output is not None:
+            payload = asdict(record)
+            payload["completed_at"] = record.completed_at.isoformat()
+
+            atomic_write_json(args.output, payload)
+
+        print("Model analysis (provisional; analyst review required):")
+        print(result.analysis)
+        print("\nRetrieved references:")
+
+        if not result.references:
+            print("None.")
+
+        for number, reference in enumerate(result.references, start=1):
+            print(f"[R{number}] {reference.title}")
+            print(f"  Source: {reference.source_url}")
+            print(f"  Chunk: {reference.chunk_id}")
+
         return
 
     evidence = read_evidence(args.evidence)
