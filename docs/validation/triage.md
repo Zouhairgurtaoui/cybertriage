@@ -72,3 +72,64 @@ about incorrect passwords, global absence of events, benign intent, or account
 lockout are report-quality failures even when the search succeeds. Unknown
 registry codes must remain unknown. Oversized tool results must produce an
 explicit error rather than silently incomplete evidence.
+
+## Recorded validation — 2026-11-25
+
+### Grouping and duplicate delivery
+
+An isolated database retained two distinct matching failed-logon alerts,
+two immutable ingestion decisions, one candidate group, two memberships,
+and one representative job. Re-delivery of the second alert reused its record,
+decision, group, and job without adding rows.
+
+Validation database: `data/validation/triage-grouping-3af2ad9ec77240b79c973e938bf912b2.sqlite3`.
+
+The representative worker job completed on attempt 1. Analysis
+`853be1104eda40fcbfeb13af77b79175` contained both distinct source identities
+and a sourced substatus definition for each member. The report interpreted
+0xc0000072 as a disabled account at the time of the attempts.
+The five-minute grouping bucket and the one-second observed event span are
+different quantities; report wording still requires scope and accuracy review.
+
+### Suppression, overrides, and feedback
+
+A separate seven-alert fixture database verified:
+
+- Exact active exceptions retained two alerts without automatic jobs.
+- Account mismatch, missing fields, expired exceptions, severity overrides,
+  and protected-event overrides scheduled individual analysis.
+- Uncertain feedback released an unscheduled alert for analysis.
+- A later malicious label preserved feedback history and reused the same job.
+- Benign feedback retained suppression without creating a job.
+- The final state contained six jobs for seven retained alerts.
+
+Validation database: `data/validation/triage-review-03b74913bfb84d2cb0d5e99b7ba1fce4.sqlite3`.
+Evaluation report: `data/validation/triage-quality-03b74913bfb84d2cb0d5e99b7ba1fce4.json`.
+
+### Evaluation calculations
+
+The fixture deliberately assigned one benign and one malicious label to alerts
+matching the same suppression exception. Five alerts remained unreviewed.
+
+| Measurement | Observed value |
+|---|---|
+| Original investigate decisions | 5 |
+| Original suppress decisions | 2 |
+| Label coverage | 2/7 (28.57%) |
+| Suppression label coverage | 2/2 (100%) |
+| Reviewed suppression precision | 1/2 (50%) |
+| Malicious suppression rate | 1/1 (100%) |
+
+The malicious original suppression remained counted after feedback released its
+alert. These intentionally adverse fixture values verify accounting and audit
+behavior; they do not estimate operational suppression quality or detection
+accuracy. The default operational configuration still has zero suppression rules.
+
+### Remaining coverage
+
+The recorded runs do not establish group behavior at the member limit, arrivals
+after claim/completion, host isolation, rollback under storage failure, audit
+trigger enforcement, or complete report accuracy. Zero-denominator evaluation
+rates, uncertain final labels, and pre-policy populations require additional
+cases. The isolated fixture ingestion exercised application/storage behavior;
+HTTP ingestion with the revised triage response also requires regression coverage.
