@@ -172,6 +172,37 @@ def _run() -> None:
         default=Path("config/sources.yaml"),
     )
 
+    worker = commands.add_parser(
+        "worker",
+        help="Process queued alert investigations.",
+    )
+    worker.add_argument(
+        "--alerts-database",
+        type=Path,
+        default=Path("data/alerts/alerts.sqlite3"),
+    )
+    worker.add_argument(
+        "--database",
+        type=Path,
+        default=Path("data/chroma"),
+    )
+    worker.add_argument(
+        "--catalog",
+        type=Path,
+        default=Path("data/catalogs/windows-security.json"),
+    )
+    worker.add_argument(
+        "--sources-config",
+        type=Path,
+        default=Path("config/sources.yaml"),
+    )
+    worker.add_argument("--model")
+    worker.add_argument("--once", action="store_true")
+    worker.add_argument("--lease-seconds", type=int, default=600)
+    worker.add_argument("--max-attempts", type=int, default=3)
+    worker.add_argument("--retry-delay-seconds", type=int, default=30)
+    worker.add_argument("--poll-seconds", type=float, default=2.0)
+
     args = parser.parse_args()
 
     if args.command == "serve":
@@ -351,6 +382,54 @@ def _run() -> None:
             print(f"[R{number}] {reference.title}")
             print(f"  Source: {reference.source_url}")
             print(f"  Chunk: {reference.chunk_id}")
+
+        return
+    if args.command == "worker":
+        import logging
+        import signal
+        from threading import Event
+
+        from cybertriage.bootstrap import build_analysis_worker
+
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s %(levelname)s %(message)s",
+        )
+
+        service = build_analysis_worker(
+            alerts_database_path=args.alerts_database.resolve(),
+            database_directory=args.database.resolve(),
+            catalog_path=args.catalog.resolve(),
+            model_name=args.model,
+            sources_config_path=args.sources_config,
+            lease_seconds=args.lease_seconds,
+            max_attempts=args.max_attempts,
+            retry_delay_seconds=args.retry_delay_seconds,
+            poll_seconds=args.poll_seconds,
+        )
+
+        stop = Event()
+
+        def request_stop(signum, frame):
+            stop.set()
+            logging.getLogger(__name__).info(
+                "Shutdown requested; finishing the current job"
+            )
+
+        previous_handlers = {}
+
+        try:
+            for signum in (signal.SIGINT, signal.SIGTERM):
+                previous_handlers[signum] = signal.signal(
+                    signum,
+                    request_stop,
+                )
+
+            service.run(stop, once=args.once)
+
+        finally:
+            for signum, handler in previous_handlers.items():
+                signal.signal(signum, handler)
 
         return
 

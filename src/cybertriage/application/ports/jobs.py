@@ -41,3 +41,19 @@ class JobFailureRecorder(Protocol):
     ) -> None:
         """Reschedule or fail a job while its claim remains valid."""
         ...
+
+
+class JobLeaseRenewer(Protocol):
+    def renew(
+        self,
+        job: ClaimedAnalysisJob,
+        *,
+        lease_seconds: int = 600,
+    ) -> None:
+        """Extend a claim that is still valid."""
+        ...
+
+
+class ClaimedJobProcessor(Protocol):
+    def execute(self, job: ClaimedAnalysisJob) -> AnalysisRecord:
+        ...

@@ -359,3 +359,45 @@ class SqliteAnalysisQueue:
             raise JobStorageError(
                 "Could not claim an analysis job."
             ) from error
+
+    def renew(
+        self,
+        job: ClaimedAnalysisJob,
+        *,
+        lease_seconds: int = 600,
+    ) -> None:
+        if type(lease_seconds) is not int or not 1 <= lease_seconds <= 86400:
+            raise ValueError(
+                "lease_seconds must be an integer from 1 to 86400."
+            )
+
+        try:
+            with closing(self._connect()) as connection:
+                with connection:
+                    connection.execute("BEGIN IMMEDIATE")
+
+                    now = datetime.now(timezone.utc)
+                    self._require_claim(
+                        connection,
+                        job,
+                        now.isoformat(),
+                    )
+
+                    connection.execute(
+                        """
+                        UPDATE analysis_jobs
+                        SET lease_expires_at = ?
+                        WHERE job_id = ?
+                        """,
+                        (
+                            (
+                                now + timedelta(seconds=lease_seconds)
+                            ).isoformat(),
+                            job.job_id,
+                        ),
+                    )
+
+        except sqlite3.Error as error:
+            raise JobStorageError(
+                "Could not renew the job lease."
+            ) from error

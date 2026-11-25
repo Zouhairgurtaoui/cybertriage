@@ -10,6 +10,7 @@ from cybertriage.adapters.configuration.yaml_files import (
     YamlKnowledgeConfiguration,
     YamlResponseConfiguration,
 )
+from cybertriage.application.services.analysis_worker import AnalysisWorker
 from cybertriage.adapters.knowledge.chunking import RecursiveKnowledgeChunker
 from cybertriage.adapters.knowledge.retrieval import FederatedKnowledgeRetriever
 from cybertriage.adapters.knowledge.sources.microsoft import MicrosoftEventSource
@@ -228,4 +229,64 @@ def build_analyze_stored_alert(
             sources_config_path=sources_config_path,
         ),
         writer=writer,
+    )
+
+def build_analysis_worker(
+    alerts_database_path: Path,
+    database_directory: Path,
+    catalog_path: Path,
+    model_name: str | None = None,
+    sources_config_path: Path = DEFAULT_SOURCES_CONFIG,
+    *,
+    lease_seconds: int = 600,
+    max_attempts: int = 3,
+    retry_delay_seconds: int = 30,
+    poll_seconds: float = 2.0,
+) -> AnalysisWorker:
+    from cybertriage.adapters.storage.alerts_sqlite import (
+        SqliteAlertRepository,
+    )
+    from cybertriage.adapters.storage.analyses_sqlite import (
+        SqliteAnalysisWriter,
+    )
+    from cybertriage.adapters.storage.jobs_sqlite import (
+        SqliteAnalysisQueue,
+    )
+    from cybertriage.application.use_cases.process_analysis_job import (
+        ProcessAnalysisJob,
+    )
+
+    if not alerts_database_path.is_file():
+        raise FileNotFoundError(
+            f"Alert database not found: {alerts_database_path}. "
+            "Start the ingestion API first."
+        )
+
+    reader = SqliteAlertRepository(alerts_database_path)
+
+    # Initialize the analyses table before opening job-result storage.
+    SqliteAnalysisWriter(alerts_database_path)
+
+    queue = SqliteAnalysisQueue(alerts_database_path)
+
+    processor = ProcessAnalysisJob(
+        reader=reader,
+        analyzer=build_analyze_alert(
+            database_directory=database_directory,
+            catalog_path=catalog_path,
+            model_name=model_name,
+            sources_config_path=sources_config_path,
+        ),
+        completer=queue,
+    )
+
+    return AnalysisWorker(
+        claimer=queue,
+        renewer=queue,
+        failures=queue,
+        processor=processor,
+        lease_seconds=lease_seconds,
+        max_attempts=max_attempts,
+        retry_delay_seconds=retry_delay_seconds,
+        poll_seconds=poll_seconds,
     )
