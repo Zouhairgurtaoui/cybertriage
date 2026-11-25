@@ -122,3 +122,17 @@ A subsequent search of the same event returned status_code 0xc000006e,
 substatus_code 0xc0000072, and failure_reason %%2310, matching the source fields.
 Agent integration remains pending.
 Retrieved logons do not independently establish malicious activity.
+## LangChain authentication tool
+
+The search_authentication tool adapts AuthenticationEventSearcher through
+a typed input schema. It accepts an account, domain, timezone-aware time
+window of at most 24 hours, and a result limit of 1–10.
+
+Results preserve source identifiers, failure details, coverage, and
+truncation metadata. Responses are limited to 12,000 UTF-8 bytes.
+Oversized responses and unsuccessful searches produce explicit errors.
+
+The adapter receives its search implementation through dependency
+injection. Credentials and query construction remain inside the Indexer
+adapters. Model binding and investigation-loop orchestration are separate
+components.
