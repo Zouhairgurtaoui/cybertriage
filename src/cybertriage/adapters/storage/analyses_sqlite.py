@@ -4,6 +4,7 @@ from contextlib import closing
 from dataclasses import asdict
 from datetime import timezone
 from pathlib import Path
+from cybertriage.adapters.storage.analysis_records import insert_analysis
 
 from cybertriage.domain.triage import (
     AnalysisRecord,
@@ -60,44 +61,9 @@ class SqliteAnalysisWriter:
 
     def save(self, record: AnalysisRecord) -> None:
         try:
-            if record.completed_at.utcoffset() is None:
-                raise ValueError(
-                    "The completion timestamp must include a timezone."
-                )
-
-            result_json = json.dumps(
-                asdict(record.result),
-                ensure_ascii=False,
-                allow_nan=False,
-            )
-
-            completed_at = record.completed_at.astimezone(
-                timezone.utc
-            ).isoformat()
-
             with closing(self._connect()) as connection:
                 with connection:
-                    connection.execute(
-                        """
-                        INSERT INTO analyses (
-                            analysis_id,
-                            alert_record_id,
-                            completed_at,
-                            retrieval_query,
-                            evidence,
-                            result_json
-                        )
-                        VALUES (?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            record.analysis_id,
-                            record.alert_record_id,
-                            completed_at,
-                            record.retrieval_query,
-                            record.evidence,
-                            result_json,
-                        ),
-                    )
+                    insert_analysis(connection, record)
 
         except (
             sqlite3.Error,

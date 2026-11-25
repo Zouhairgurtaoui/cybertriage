@@ -13,3 +13,6 @@ class ClaimedAnalysisJob:
 
 class JobStorageError(RuntimeError):
     """The analysis queue could not be accessed."""
+
+class JobLeaseLostError(RuntimeError):
+    """The worker no longer owns a valid claim on this job."""
