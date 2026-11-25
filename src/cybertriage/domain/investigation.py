@@ -72,6 +72,9 @@ class AuthenticationEvent:
     source_ip: str | None = None
     logon_type: str | None = None
     logon_id: str | None = None
+    status_code: str | None = None
+    substatus_code: str | None = None
+    failure_reason: str | None = None
 
 
 @dataclass(frozen=True)

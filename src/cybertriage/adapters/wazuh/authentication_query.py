@@ -17,6 +17,9 @@ SOURCE_FIELDS = (
     "data.win.eventdata.ipAddress",
     "data.win.eventdata.logonType",
     "data.win.eventdata.targetLogonId",
+    "data.win.eventdata.status",
+    "data.win.eventdata.subStatus",
+    "data.win.eventdata.failureReason",
 )
 
 

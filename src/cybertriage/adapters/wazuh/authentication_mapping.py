@@ -169,6 +169,18 @@ def _parse_hit(
         source_ip=source_ip,
         logon_type=logon_type,
         logon_id=logon_id,
+        status_code=_optional_text(
+            fields.get("status"),
+            "status",
+        ),
+        substatus_code=_optional_text(
+            fields.get("subStatus"),
+            "subStatus",
+        ),
+        failure_reason=_optional_text(
+            fields.get("failureReason"),
+            "failureReason",
+        ),
     )
 
 
