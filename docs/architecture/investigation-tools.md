@@ -29,3 +29,19 @@ Field mappings require verification against the deployed Indexer.
 
 Current status: contract and query builder implemented;
 HTTP adapter, live validation, and agent integration pending.
+## Indexer HTTP transport
+
+The HTTP client uses a configured HTTPS origin, a trusted CA bundle,
+and dedicated read-only Indexer credentials.
+
+Searches are restricted to wazuh-alerts-*.
+Redirects and implicit environment authentication/proxies are disabled.
+
+Responses are limited to 2 MiB. Timed-out, early-terminated,
+failed-shard, malformed, or oversized responses raise a search error.
+
+Connection and read-inactivity timeouts are configured.
+These are not a total wall-clock deadline.
+
+Current status: HTTP transport implemented; event mapping,
+connection configuration, live validation, and agent integration pending.
