@@ -55,9 +55,4 @@ JSON report file is application storage, not a required model-output format.
 
 The policy foundation does not imply the approval/execution workflow is complete.
 
-## Testing
 
-Testing is owned by the project owner. The current coding-only changes have not
-been exercised after that instruction. Earlier experimental outputs remain under
-ignored `data/evaluations/`; they are historical results, not certification of
-this implementation.
