@@ -136,3 +136,22 @@ The adapter receives its search implementation through dependency
 injection. Credentials and query construction remain inside the Indexer
 adapters. Model binding and investigation-loop orchestration are separate
 components.
+## Model investigation loop
+
+OllamaInvestigationModel implements the InvestigationModel port.
+It maintains a separate conversation for each investigation and exposes
+only explicitly registered tools.
+
+An investigation permits at most two tool requests and three model
+responses. Duplicate requests are rejected without repeating the search.
+Tool results are returned through messages linked to their call IDs.
+
+After the tool budget is exhausted, the final model request omits tool
+definitions. Empty, unfinished, malformed, or over-budget responses fail
+without accepting a partial report.
+
+The result contains report text and structured tool execution records.
+Conversation size is bounded by a serialized-byte limit, which does not
+represent an exact token count.
+
+CLI, background-worker integration, and live model validation remain pending.
