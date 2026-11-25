@@ -87,3 +87,18 @@ Shared transport, typed authentication mapping, environment configuration,
 and the CLI are implemented. Live connectivity, TLS hostname verification,
 read-only permissions, field mappings, and search behaviour still require
 validation before agent integration.
+## Live validation — 2026-11-25
+
+The CLI retrieved nine matching Windows Security 4624 alerts
+for a known CORP account on WS01.
+
+Search window: 2026-09-01 17:00–17:30 UTC.
+Requested limit: 10. Returned has_more: false.
+
+Verified:
+- HTTPS connection and authentication.
+- Account, domain, event-type, and time filtering for this sample.
+- Typed results with source identifiers and UTC timestamps.
+
+Failed-logon mapping and agent integration remain pending.
+Retrieved logons do not independently establish malicious activity.
