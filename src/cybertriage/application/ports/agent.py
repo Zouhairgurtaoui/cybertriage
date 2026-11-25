@@ -9,5 +9,7 @@ class InvestigationModel(Protocol):
         self,
         evidence: str,
         references: tuple[RetrievedReference, ...],
+        *,
+        task: str,
     ) -> InvestigationReport:
         ...

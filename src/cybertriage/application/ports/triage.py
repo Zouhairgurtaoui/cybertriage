@@ -1,7 +1,5 @@
 from typing import Protocol
 
-from typing import Protocol
-
 from cybertriage.domain.security_event import EventIdentity
 from cybertriage.domain.triage import (
     AnalysisRecord,
@@ -33,6 +31,8 @@ class AlertAnalyzer(Protocol):
         evidence: str,
         retrieval_query: str | None = None,
         event: EventIdentity | None = None,
+        *,
+        investigation_task: str | None = None,
     ) -> TriageResult:
         ...
 

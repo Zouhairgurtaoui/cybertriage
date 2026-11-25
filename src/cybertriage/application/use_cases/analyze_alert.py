@@ -1,13 +1,12 @@
+from cybertriage.application.ports.agent import InvestigationModel
 from cybertriage.application.ports.event_catalog import SecurityEventCatalog
 from cybertriage.application.ports.triage import (
     KnowledgeRetriever,
     TriageModel,
 )
+from cybertriage.domain.agent import ToolExecution, validate_investigation_task
 from cybertriage.domain.security_event import EventIdentity
 from cybertriage.domain.triage import RetrievedReference, TriageResult
-
-from cybertriage.application.ports.agent import InvestigationModel
-from cybertriage.domain.agent import ToolExecution
 
 
 class AnalyzeAlert:
@@ -29,14 +28,23 @@ class AnalyzeAlert:
         self._catalog = catalog
         self._investigator = investigator
 
-    
-    #
     def execute(
         self,
         evidence: str,
         retrieval_query: str | None = None,
         event: EventIdentity | None = None,
+        *,
+        investigation_task: str | None = None,
     ) -> TriageResult:
+        task: str | None = None
+
+        if self._investigator is not None:
+            task = validate_investigation_task(investigation_task)
+        elif investigation_task is not None:
+            raise ValueError(
+                "An investigation task requires investigation mode."
+            )
+
         evidence = evidence.strip()
 
         if not evidence:
@@ -122,9 +130,13 @@ class AnalyzeAlert:
                 references=reference_tuple,
             )
         else:
+            if task is None:
+                raise RuntimeError("Investigation task was not initialized.")
+
             investigation = self._investigator.investigate(
                 evidence=model_evidence,
                 references=reference_tuple,
+                task=task,
             )
             analysis = investigation.analysis
             tool_executions = investigation.tool_executions
@@ -139,4 +151,5 @@ class AnalyzeAlert:
             references=reference_tuple,
             event_definition=definition,
             tool_executions=tool_executions,
+            investigation_task=task,
         )

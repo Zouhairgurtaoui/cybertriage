@@ -160,11 +160,24 @@ represent an exact token count.
 `analyze --investigate` enables the bounded investigation model.
 Without this flag, analysis uses the ordinary triage model.
 
+Investigation requires an explicit analyst task supplied through --task.
+The CLI validates the task before constructing analysis dependencies.
+The application and model adapter use the same task validator: nonempty text,
+at most 4,000 UTF-8 bytes, with unsupported control characters rejected.
+Supplying --task without --investigate is an input error.
+
+The task is passed as a separate analyst message rather than embedded in
+incident evidence. Evidence, reference excerpts, and tool outputs remain
+untrusted data. Task parameters describe requested checks, not observed facts.
+The investigation prompt requests explicit, valid analyst searches before
+report generation; this instruction does not guarantee model compliance.
+
 Knowledge retrieval and event catalogue lookup run before model analysis.
 The composition root registers the authentication search tool and provides
 its configured Indexer client.
 
-Saved results include tool_executions alongside report text and references.
+Saved results include investigation_task and tool_executions alongside report
+text and references. Ordinary analysis stores a null investigation_task.
 Each execution records its call ID, tool name, arguments, result, and status.
 An empty execution list means no tool calls were recorded.
 

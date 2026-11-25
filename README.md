@@ -225,21 +225,26 @@ Live searches require the Indexer to be reachable.
 
 ## Read-only investigation
 
-Add `--investigate` to `analyze` to enable bounded authentication searches.
+Add `--investigate` and an explicit `--task` to `analyze` to enable bounded
+authentication searches. `--task` is required in investigation mode and is
+rejected without `--investigate`. Tasks are limited to 4,000 UTF-8 bytes.
 The command requires the configured Indexer connection and credentials,
 populated knowledge collections, and the configured models available in Ollama.
 
 Evidence or analyst instructions must supply the account, domain, and
-timezone-aware investigation window. The model may request up to two tools.
-Saved JSON reports include tool execution records. The CLI displays each
+timezone-aware investigation window. The analyst task is passed separately
+from the evidence file; instructions embedded in logs are treated as data.
+The model may request up to two tools. Saved JSON reports include the task
+and tool execution records. The CLI displays each
 recorded tool's name, status, and call ID.
 
 ```powershell
-python -m cybertriage analyze --evidence examples/alerts/authentication-investigation.txt --event-id 4625 --provider Microsoft-Windows-Security-Auditing --channel Security --investigate --output data/reports/authentication-investigation.json
+python -m cybertriage analyze --evidence examples/alerts/authentication-investigation.txt --event-id 4625 --provider Microsoft-Windows-Security-Auditing --channel Security --investigate --task "Call search_authentication for account zguertaoui in domain CORP from 2026-09-01T02:24:50Z inclusive to 2026-09-01T02:25:00Z exclusive, limit 5. Use the returned evidence to explain the failed logon and state remaining uncertainty." --output data/reports/authentication-investigation.json
 ```
 
-The example contains a recorded failed-logon event and an explicit analyst
-search request. Inspect `tool_executions` in the saved report to distinguish
+The evidence file contains a recorded failed-logon event. The command supplies
+the analyst search request through --task. Inspect `tool_executions` in the
+saved report to distinguish
 successful searches from errors or a run without tool calls. A completed report
 does not by itself verify successful evidence retrieval.
 

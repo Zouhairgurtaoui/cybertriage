@@ -20,6 +20,7 @@ class TriageResult:
     references: tuple[RetrievedReference, ...]
     event_definition: SecurityEventDefinition | None = None
     tool_executions: tuple[ToolExecution, ...] = ()
+    investigation_task: str | None = None
 
 @dataclass(frozen=True)
 class AnalysisRecord:

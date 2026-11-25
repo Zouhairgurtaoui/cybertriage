@@ -72,6 +72,10 @@ def _run() -> None:
         action="store_true",
         help="Enable bounded read-only investigation tool calls.",
     )
+    analyze.add_argument(
+        "--task",
+        help="Analyst investigation instruction; requires --investigate.",
+    )
     ingest = commands.add_parser(
         "ingest",
         help="Fetch, chunk, and store reference knowledge.",
@@ -236,6 +240,17 @@ def _run() -> None:
     authentication.add_argument("--output", type=Path)
 
     args = parser.parse_args()
+
+    if args.command == "analyze":
+        if args.investigate:
+            from cybertriage.domain.agent import validate_investigation_task
+
+            try:
+                args.task = validate_investigation_task(args.task)
+            except ValueError as error:
+                parser.error(f"--investigate requires a valid --task: {error}")
+        elif args.task is not None:
+            parser.error("--task requires --investigate.")
 
     if args.command == "serve":
         import os
@@ -584,6 +599,7 @@ def _run() -> None:
         evidence=evidence,
         retrieval_query=args.query,
         event=event,
+        investigation_task=args.task,
     )
     if args.output is not None:
         from dataclasses import asdict
