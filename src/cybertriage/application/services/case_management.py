@@ -55,6 +55,9 @@ class CaseManagement:
     def get(self, case_id: str) -> IncidentCase:
         return self._repository.get(identifier(case_id))
 
+    def require_active_alert(self, case_id: str, alert_id: str) -> None:
+        self._repository.require_active_alert(identifier(case_id), identifier(alert_id))
+
     def list_cases(self, status: str | None = None, limit: int = 50, after: str | None = None) -> Mapping[str, object]:
         page(limit)
         if status is not None and status not in STATUSES:

@@ -27,3 +27,6 @@ dist/
 .env/
 .venv/
 /.env.*
+
+# Deployment-specific access policies and firewall bindings
+/config/*.local.yaml

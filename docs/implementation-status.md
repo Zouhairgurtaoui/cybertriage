@@ -51,6 +51,16 @@ Implemented code paths:
   Neo4j publication with namespace/case isolation and explicit schema setup.
 - Evidence-backed operator Kill Chain assessments, append-only reviews and
   unassessed stages; hypotheses and reported chronology retain their meanings.
+- Incremental Neo4j delivery worker with durable per-namespace case-version cursors.
+- Bounded retained-alert correlation candidates with explicit host/account roles,
+  evidence hashes and time distances; no automatic attachment or causal findings.
+- Persisted response proposals, reviews, approval expiry, version/evidence/policy
+  bindings, at-most-one dispatch claims, outcomes and explicit reconciliation.
+- Vendor-independent firewall gateway/executor contracts and an OPNsense external
+  alias adapter, with application-managed block leases and an expiry worker.
+- A separate analyst API with hashed expiring credentials, explicit operation/case
+  permissions, authenticated audit actors, bounded request bodies and OpenAPI.
+- A separate leased queue and worker for explicit analyst-requested investigations.
 
 ## What the YAML files actually control
 
@@ -58,10 +68,13 @@ Implemented code paths:
 It controls source enablement, MITRE revision, collection names, Microsoft pages
 and URLs, and chunk size/overlap.
 
-`response_actions.yaml` is loaded for response-policy preview. It controls
+`response_actions.yaml` is loaded for response preview and persisted workflows. It controls
 execution enablement, action rules, targets, required parameters, duration,
 protected networks, and approval lifetime. Execution is disabled by default.
-No actual firewall executor is implemented or invoked by the preview.
+The preview never invokes an executor. OPNsense execution requires an explicitly
+configured named target in firewall configuration and an approved stored proposal.
+`firewalls.yaml` ships with no targets; deployment-specific `.local.yaml` variants
+are ignored. Analyst credentials likewise require explicit local provisioning.
 
 `triage.yaml` is loaded by ingestion for scheduling decisions. Its revision and
 settings snapshot are retained with the audit trail. The authentication code
@@ -77,25 +90,28 @@ application data; the model is not required to generate JSON.
 
 ## Remaining backend work
 
-- Automatic cross-technique case correlation, graph synchronization/outbox and
-  authenticated analyst graph visualization.
+- Labelled evaluation of correlation candidates and any future causal/automatic
+  case assignment; the implemented candidate query does not establish an attack chain.
+- Analyst web application, including authenticated graph visualization.
 - Live scoped-worker validation and additional investigation tools.
 - Labelled retrieval relevance evaluation, live source compatibility/workload
   validation, and additional source providers/discovery strategies.
 - Real-model grounding/report-quality evaluation and operational workload validation.
-- Authenticated analyst review, stored approvals and audit records.
-- Allowlisted response executors connected to the response policy.
-- API endpoints for the future analyst web application.
-- Deployment configuration and documentation.
+- Live analyst API authorization and requested-investigation queue regression.
+- OPNsense API/version, rule placement, traffic effects, expiry and failure-recovery
+  acceptance. FortiGate/pfSense concrete adapters are not implemented.
+- Operational deployment acceptance, backup/restore and monitoring verification.
 
-The policy foundation does not imply the approval/execution workflow is complete.
-Local case findings are stored, but authenticated approvals and executors are
-not yet connected. See [case architecture](architecture/cases.md).
+The core response and analyst backend paths are implemented, with execution
+disabled by default. This is not a claim of runtime or production acceptance.
+See [response architecture](architecture/response-workflow.md),
+[analyst API](architecture/analyst-api.md) and [operations](operations.md).
 
 The triage policy ships with no active suppression rules. Unknown alerts remain
 eligible for analysis. Existing queue contents are not retroactively filtered.
-Operator CLI actor identifiers are asserted metadata; authenticated analyst
-sessions and authorization are required before exposing review through a web API.
+Operator CLI actor identifiers remain asserted metadata. Analyst HTTP operations
+use authenticated API principals; browser login/session integration remains part
+of the future web application.
 
 
 
@@ -152,4 +168,10 @@ fixtures and a scripted Neo4j substitute. They have not been executed. Real
 Neo4j schema/query compatibility, concurrency and publication remain unvalidated;
 the offline substitute does not parse Cypher. End-to-end live investigation and
 case validation remain pending.
+
+The response workflow, OPNsense gateway, expiry worker, analyst API, requested
+investigation queue, candidate query and incremental graph delivery have received
+syntax/import/CLI checks only. Their functional, concurrency, live-device and
+regression acceptance remains pending. The historical 29-check result does not
+cover these changes. Reinforcement-learning model training is not implemented.
 

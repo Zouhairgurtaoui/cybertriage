@@ -487,6 +487,46 @@ def build_case_management(database_path: Path) -> "CaseManagement":
     return CaseManagement(SqliteCaseRepository(database_path), ObservedRelationshipPolicy())
 
 
+def build_response_runtime(database_path: Path, response_config: Path = DEFAULT_RESPONSE_CONFIG,
+                           firewalls_config: Path = Path("config/firewalls.yaml")):
+    from dataclasses import asdict
+    from hashlib import sha256
+    from cybertriage.adapters.configuration.firewall_yaml import YamlFirewallConfiguration
+    from cybertriage.adapters.opnsense import OpnsenseFirewallGateway
+    from cybertriage.adapters.storage.responses_sqlite import SqliteResponseRepository
+    from cybertriage.application.services.block_ip import ExpireIpBlocks, ManagedIpBlockExecutor
+    from cybertriage.application.services.response_workflow import ResponseWorkflow
+    from cybertriage.domain.response_workflow import ResponsePolicySnapshot, canonical
+
+    # New vendor adapters register here; proposal/review/execution services remain unchanged.
+    providers = {"opnsense": OpnsenseFirewallGateway}
+    targets = YamlFirewallConfiguration(firewalls_config, tuple(providers)).load()
+    revision = sha256(canonical([asdict(target) for target in targets]).encode()).hexdigest()
+    gateways = {target.name: providers[target.driver](target) for target in targets}
+    repository = SqliteResponseRepository(database_path)
+    snapshot = ResponsePolicySnapshot(YamlResponseConfiguration(response_config).load(), revision)
+    workflow = ResponseWorkflow(repository, snapshot,
+        {("block_ip", name): ManagedIpBlockExecutor(gateway) for name, gateway in gateways.items()})
+    return workflow, ExpireIpBlocks(repository, gateways, revision), repository
+
+
+def build_requested_investigation_worker(alerts_database_path: Path, database_directory: Path,
+                                         catalog_path: Path, sources_config_path: Path = DEFAULT_SOURCES_CONFIG,
+                                         *, model_name: str | None = None, offline_knowledge: bool = False):
+    from cybertriage.adapters.storage.investigation_requests import SqliteInvestigationRequests
+    from cybertriage.adapters.storage.alerts_sqlite import SqliteAlertRepository
+    from cybertriage.adapters.storage.triage_sqlite import SqliteTriageReviewRepository
+    from cybertriage.application.services.requested_investigation import ProcessRequestedInvestigation
+
+    queue = SqliteInvestigationRequests(alerts_database_path)
+    grounder = build_authentication_grounder()
+    processor = ProcessRequestedInvestigation(queue, SqliteAlertRepository(alerts_database_path),
+        build_analyze_alert(database_directory, catalog_path, model_name, sources_config_path,
+            investigate=True, offline_knowledge=offline_knowledge), grounder,
+        SqliteTriageReviewRepository(alerts_database_path, grounder=grounder))
+    return AnalysisWorker(claimer=queue, renewer=queue, failures=queue, processor=processor)
+
+
 def build_case_stages(database_path: Path):
     from cybertriage.adapters.storage.case_stages_sqlite import SqliteCaseStageRepository
     from cybertriage.application.services.case_stages import CaseStages

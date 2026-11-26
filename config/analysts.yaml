@@ -1,0 +1,5 @@
+schema_version: 1
+
+# Store only hashes of independently generated per-analyst bearer tokens.
+# Configure explicit permissions, case scope and expiry before starting the API.
+principals: []

@@ -65,7 +65,8 @@ explicit platform compatibility and document diversity. Reports retain a
 retrieval trace explaining the selected background references.
 Authenticated Wazuh ingestion, SQLite-backed background analysis, and a read-only
 authentication search are implemented. The analysis CLI supports opt-in model
-tool calling. There is no firewall executor or approval-storage workflow yet.
+tool calling. Persisted proposals/approvals and an OPNsense firewall adapter are
+implemented behind explicit policy and analyst authorization checks.
 Background workers support opt-in scoped authentication investigation. The analyst
 web application remains planned. See
 [implementation status](docs/implementation-status.md).
@@ -164,10 +165,10 @@ The preview always lacks analyst approval. Its optional `--disposition` argument
 is a what-if input, not a stored case-review decision.
 
 The policy binds approval to the exact case, action, target, and parameters.
-Changing those fields changes the proposal fingerprint. An authenticated review
-workflow and execution adapter are future components; the policy alone does not
-implement them. Adding an entry to YAML cannot create an arbitrary command:
-an action also needs a registered parameter validator and, later, an executor.
+Changing those fields changes the proposal fingerprint. The persisted workflow
+also binds approval to case/evidence and policy/target revisions. Adding YAML
+cannot create an arbitrary command: an action needs a registered parameter
+validator and allowlisted executor. See the backend workflow section below.
 
 See [architecture](docs/architecture.md) for the ports-and-adapters boundaries.
 
@@ -476,8 +477,9 @@ reviews require the latest `--expected-version`.
 Every case command supports `--alerts-database PATH`; the default is
 `data/alerts/alerts.sqlite3`. Read commands support bounded pagination; use
 `--help` for their options. Actor names are local audit metadata, not login
-credentials. Case HTTP access and authenticated analyst sessions remain separate
-work. Optional graph projection is described below.
+credentials. The separate analyst API uses authenticated per-analyst credentials
+and case permissions. Browser login remains part of the future web application.
+Optional graph projection is described below.
 
 Offline validation, without the VMs or Ollama:
 
@@ -532,11 +534,13 @@ CYBERTRIAGE_GRAPH_NAMESPACE=cybertriage
 Remote servers require verified TLS: `neo4j+s://HOST:7687` or `bolt+s://HOST:7687`.
 The password can be omitted for a hidden interactive prompt. Initialize the
 constraint with a suitably privileged account, then publish with the projection
-account. Sync only publishes the selected case; it does not run automatically:
+account. Explicit sync publishes the selected case; the optional worker publishes
+changed versions continuously:
 
 ```powershell
 python -m cybertriage graph-schema
 python -m cybertriage graph-sync --case-id $incident.case_id
+python -m cybertriage graph-worker
 python scripts/validate_case_graph.py
 ```
 
@@ -553,6 +557,191 @@ For stage assessments, expand `CT_HAS_STAGE_ASSESSMENT` and `CT_ASSESSES_STAGE`.
 `CT_FRAMEWORK_NEXT` is reference order, while `CT_NEXT_REPORTED_TIME` is source
 chronology; neither establishes an attacker path. SQLite remains authoritative.
 See [graph semantics, limits and security](docs/architecture/graph.md).
+
+### Analyst backend and response workflow
+
+The backend now supports case review, queued additional investigations, graph
+reads and persisted response proposals/approvals through a separate analyst API.
+The current firewall adapter is OPNsense. `FirewallGateway` and `ActionExecutor`
+are the extension points for other vendors; FortiGate/pfSense drivers are not
+implemented yet. The analyst web interface is a separate component.
+
+Create ignored deployment configuration from the shipped templates:
+
+```powershell
+Copy-Item config/analysts.yaml config/analysts.local.yaml
+Copy-Item config/firewalls.yaml config/firewalls.local.yaml
+Copy-Item config/response_actions.yaml config/response_actions.local.yaml
+python -m cybertriage analyst-key
+```
+
+The last command displays a random token and its SHA-256 hash. Keep the token
+private; put only the hash in `config/analysts.local.yaml`. Provision separate
+credentials for different analysts/roles. Example structure, with placeholders
+to replace and a future UTC expiry chosen for the deployment:
+
+```yaml
+schema_version: 1
+principals:
+  - id: analyst-1
+    token_sha256: REPLACE_WITH_GENERATED_SHA256
+    permissions:
+      - cases:read
+      - cases:write
+      - cases:review
+      - investigations:request
+      - reports:read_all
+      - responses:propose
+      - responses:approve
+      - responses:execute
+      - responses:reconcile
+      - triage:review
+    case_ids: ["*"]
+    expires_at: "REPLACE_WITH_FUTURE_ISO_UTC_TIMESTAMP"
+```
+
+This example grants all listed capabilities and global evidence scope; restrict
+both for each actual role. A list of explicit case IDs narrows case access.
+Complete reports, related-alert discovery and new tool investigations currently
+require global evidence scope because related tool results/group inputs can
+extend beyond a case's attachments. API audit actors come from credentials, not
+request fields. Ingestion credentials are separate.
+
+Start the analyst API, which binds to loopback on port 8001 by default:
+
+```powershell
+python -m cybertriage serve-analyst --response-config config/response_actions.local.yaml --firewalls-config config/firewalls.local.yaml
+```
+
+For a direct non-loopback listener, supply `--tls-certificate` and `--tls-key`.
+A TLS reverse proxy can instead target loopback. No wildcard CORS is enabled.
+Read the authenticated schema or cases using a separately configured analyst
+token in PowerShell:
+
+```powershell
+$env:CYBERTRIAGE_ANALYST_TOKEN = "REPLACE_WITH_GENERATED_TOKEN"
+$headers = @{ Authorization = "Bearer $env:CYBERTRIAGE_ANALYST_TOKEN" }
+Invoke-RestMethod -Uri http://127.0.0.1:8001/api/v1/me -Headers $headers
+Invoke-RestMethod -Uri http://127.0.0.1:8001/api/v1/schema -Headers $headers
+Invoke-RestMethod -Uri http://127.0.0.1:8001/api/v1/cases -Headers $headers
+```
+
+Use the schema for case, graph, stage, response and investigation request bodies.
+The server rejects extra fields and derives the audit actor from authentication.
+Permission, expiry and case-version checks are independent of model output.
+
+#### Additional investigations and related-alert candidates
+
+For an existing open case with an attached alert, queue an additional investigation
+without overwriting its automatic job or previous report:
+
+```powershell
+$current = python -m cybertriage case-show --case-id $incident.case_id | ConvertFrom-Json
+$request = python -m cybertriage request-investigation --case-id $incident.case_id --alert-id $alertA --expected-version $current.version --actor analyst --idempotency-key review-001 --task "Check related authentication and account activity; separate observed facts from hypotheses." | ConvertFrom-Json
+python -m cybertriage investigation-worker --once --job-id $request.job_id
+python -m cybertriage investigation-status --case-id $incident.case_id --job-id $request.job_id
+```
+
+Use `investigation-worker` without `--once` for continuous requested work.
+Non-interactive investigation workers need the existing read-only Indexer
+environment settings/password. The analyst objective cannot expand the
+application-generated query scope or tool budget.
+
+Inspect retained-alert coincidences before deciding to attach more evidence:
+
+```powershell
+python -m cybertriage case-candidates --case-id $incident.case_id --anchor-alert-id $alertA --window-seconds 300 --limit 20
+```
+
+Candidates preserve host/account field roles, evidence hashes and time distance.
+Shared fields and temporal proximity do not prove the same attacker or a causal
+sequence. Discovery does not change case membership or disposition.
+
+#### OPNsense target setup
+
+In OPNsense, create an enabled **External (advanced)** alias dedicated exclusively
+to CyberTriage, such as `CyberTriageBlock`. Configure an appropriate blocking rule
+referencing that alias on the actual traffic path. Provision a dedicated API
+key/secret with the required alias-read/update privileges. Appliance ACLs may be
+broader than one alias; the adapter restricts its own operations to the configured
+container. See the official [alias documentation](https://docs.opnsense.org/manual/aliases.html).
+
+Configure the deployment binding in `config/firewalls.local.yaml`:
+
+```yaml
+schema_version: 1
+targets:
+  lab-firewall:
+    driver: opnsense
+    base_url: https://opnsense.example.internal
+    alias: CyberTriageBlock
+    ca_bundle: C:/CyberTriage/certs/opnsense-root-ca.pem
+    api_key_env: CYBERTRIAGE_OPNSENSE_API_KEY
+    api_secret_env: CYBERTRIAGE_OPNSENSE_API_SECRET
+    exclusive_alias: true
+    application_managed_expiry: true
+```
+
+Use an existing absolute CA file path, or `system` for a publicly/system-trusted
+certificate. The configured hostname/IP must match the certificate. Put actual
+credentials in ignored `.env.local` or the service environment:
+
+```dotenv
+CYBERTRIAGE_OPNSENSE_API_KEY="REPLACE_WITH_KEY"
+CYBERTRIAGE_OPNSENSE_API_SECRET="REPLACE_WITH_SECRET"
+```
+
+Only named targets allowed by response policy can be selected. Execution stays
+disabled in the shipped response configuration. Enable it deliberately in the
+deployment policy only when the configured lab integration is ready for acceptance.
+Do not treat a model recommendation as a confirmed case finding.
+
+OPNsense alias operations do not supply a per-address TTL. This integration
+therefore uses an application-managed expiry worker. **An application/worker
+outage or laptop sleep can extend a block's duration.** The two explicit target
+flags acknowledge exclusive alias ownership and this expiry contract; they do
+not create a native device expiry guarantee. Keep the worker on a reliable host:
+
+```powershell
+python -m cybertriage response-expiry-worker --config config/response_actions.local.yaml --firewalls-config config/firewalls.local.yaml
+```
+
+Run the expiry worker while leases exist, including after disabling new execution.
+Do not manually share this alias with another writer. The adapter does not flush
+tables, modify arbitrary rules or clear established firewall states. It records
+observed alias membership separately from verified traffic blocking.
+
+#### Propose, review and execute
+
+The case must be open and have a supported, evidence-backed confirmed-compromise
+finding before approval. Both the policy and target must be configured. The
+following operations are separate; proposal/review never dispatch implicitly:
+
+```powershell
+$current = python -m cybertriage case-show --case-id $incident.case_id | ConvertFrom-Json
+$proposal = python -m cybertriage response-propose --config config/response_actions.local.yaml --firewalls-config config/firewalls.local.yaml --case-id $incident.case_id --expected-version $current.version --action block_ip --target lab-firewall --parameters-file examples/actions/block-ip.json --supporting-alert-id $alertA --idempotency-key block-001 --actor analyst --reason "Contain the address supported by the reviewed evidence." | ConvertFrom-Json
+python -m cybertriage response-review --config config/response_actions.local.yaml --firewalls-config config/firewalls.local.yaml --proposal-id $proposal.proposal_id --expected-version $proposal.current_case_version --decision approved --actor reviewer --reason "Reviewed the exact target, address, duration and evidence."
+```
+
+Refresh the stored proposal before explicit execution:
+
+```powershell
+$approved = python -m cybertriage response-show --config config/response_actions.local.yaml --firewalls-config config/firewalls.local.yaml --proposal-id $proposal.proposal_id | ConvertFrom-Json
+python -m cybertriage response-execute --config config/response_actions.local.yaml --firewalls-config config/firewalls.local.yaml --proposal-id $proposal.proposal_id --expected-version $approved.current_case_version --actor responder --reason "Execute the current authorized proposal."
+```
+
+Case, evidence, policy or target changes invalidate existing authority. Expired
+or stale proposals need a fresh proposal/review. One proposal has at most one
+dispatch claim; a lost response is resolved by reading its state, not retrying
+the mutation. `unknown`/abandoned outcomes require stopping the original process,
+checking the appliance and using `response-reconcile` or
+`response-release-reconcile` with verified evidence. Never mark absence or
+success from a timeout alone.
+
+For single-host process operation, backups and unresolved-action handling see
+[operations](docs/operations.md), [response lifecycle](docs/architecture/response-workflow.md)
+and [analyst API](docs/architecture/analyst-api.md). Functional and live-device
+acceptance remain pending; implemented code is not a production acceptance result.
 
 ### Project documentation
 

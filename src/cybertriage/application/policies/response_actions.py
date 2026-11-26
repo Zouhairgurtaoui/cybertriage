@@ -25,6 +25,8 @@ class BlockIpParameterValidator:
             if not isinstance(raw_ip, str):
                 raise ValueError("Expected an IP string.")
             address = ip_address(raw_ip)
+            if address.is_unspecified or address.is_multicast or getattr(address, "scope_id", None):
+                errors.append("Blocking requires an individual, unscoped unicast address.")
             effective_address = getattr(address, "ipv4_mapped", None) or address
             if any(candidate in ip_network(network)
                    for network in rule.protected_networks
@@ -52,6 +54,25 @@ class ResponseActionPolicy:
         if len(self._rules) != len(settings.rules):
             raise ValueError("Duplicate response action rules.")
 
+    def validate_proposal(self, proposal: ActionProposal) -> PolicyDecision:
+        """Check the action contract without granting approval or execution authority."""
+        rule = self._rules.get(proposal.action)
+        if rule is None:
+            return PolicyDecision(False, ("Action is not in the configured allowlist.",))
+        errors = []
+        if not rule.enabled:
+            errors.append("This response action is disabled.")
+        if proposal.target not in rule.allowed_targets:
+            errors.append("Target is not approved for this action.")
+        if set(proposal.parameters) != set(rule.required_parameters):
+            errors.append("Parameters do not match the configured action contract.")
+        validator = self._validators.get(proposal.action)
+        if validator is None:
+            errors.append("No parameter validator is registered for this action.")
+        else:
+            errors.extend(validator.validate(proposal, rule))
+        return PolicyDecision(not errors, tuple(errors))
+
     def evaluate(
         self,
         proposal: ActionProposal,
@@ -64,17 +85,7 @@ class ResponseActionPolicy:
         errors = []
         if not self._settings.execution_enabled:
             errors.append("Response execution is disabled in configuration.")
-        if not rule.enabled:
-            errors.append("This response action is disabled.")
-        if proposal.target not in rule.allowed_targets:
-            errors.append("Target is not approved for this action.")
-        if set(proposal.parameters) != set(rule.required_parameters):
-            errors.append("Parameters do not match the configured action contract.")
-        validator = self._validators.get(proposal.action)
-        if validator is None:
-            errors.append("No parameter validator is registered for this action.")
-        else:
-            errors.extend(validator.validate(proposal, rule))
+        errors.extend(self.validate_proposal(proposal).reasons)
         if disposition is not IncidentDisposition.CONFIRMED_COMPROMISE:
             errors.append("Compromise has not been confirmed through the case-review workflow.")
         if approval is None:

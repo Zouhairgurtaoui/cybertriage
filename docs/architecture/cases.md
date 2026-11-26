@@ -118,20 +118,22 @@ retain 1,000 historical alert memberships; an alert can belong to 20 active case
 
 ## Security and integration boundary
 
-Case mutation is available only through the local operator CLI/application
-service. The ingestion token does not grant case-review access, and no new case
-HTTP endpoints or model mutation tools are registered. Actor strings are
-asserted local metadata, not authenticated identities. Local database and
-operating-system permissions remain the access boundary.
+Case mutation is available through local operator services and the separate
+[authenticated analyst API](analyst-api.md). The ingestion token grants no
+case-review capability. CLI actors are asserted local metadata; API actors come
+from authenticated principal configuration. Model tools cannot mutate cases.
+Local database and operating-system permissions remain necessary.
 
-An analyst web API must add authentication and case/evidence authorization,
-including authorization for every alert covered by a requested report.
-Response approvals and firewall execution remain separate, unimplemented
-workflows. SQLite is the source of truth. The optional [case graph projection](graph.md)
+Complete reports and tool-driven investigations require global evidence access;
+case-scoped reads cannot reveal group inputs or tool results outside their case.
+[Response proposals, approvals and OPNsense execution](response-workflow.md) use
+stored case findings and independent authorization checks. SQLite is authoritative.
+The optional [case graph projection](graph.md)
 exports retained evidence to JSON/Neo4j, with explicit evidence-backed Cyber Kill
-Chain assessments and append-only reviews. Automatic cross-technique correlation
-and the analyst web graph remain future work; a timeline or accepted hypothesis
-does not fill missing attack stages.
+Chain assessments and append-only reviews. Retained-alert correlation candidates
+use explicit reported-field/time coincidences without automatic attachment.
+Confirmed causal attack reconstruction and the analyst web graph remain separate
+work; a timeline or accepted hypothesis does not fill missing attack stages.
 
 ## Offline validation
 

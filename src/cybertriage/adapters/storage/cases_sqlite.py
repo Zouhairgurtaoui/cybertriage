@@ -96,6 +96,11 @@ class SqliteCaseRepository:
         with self._session() as connection:
             return self._case(connection, case_id)
 
+    def require_active_alert(self, case_id: str, alert_id: str) -> None:
+        with self._session() as connection:
+            self._case(connection, case_id)
+            self._attached(connection, case_id, [alert_id])
+
     def list_cases(self, status: str | None, limit: int, after: str | None) -> Mapping[str, object]:
         with self._session() as connection:
             rows = connection.execute("""SELECT * FROM incident_cases WHERE (? IS NULL OR status=?)

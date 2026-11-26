@@ -97,20 +97,24 @@ are described in [case graphs](architecture/graph.md). SQLite remains authoritat
 
 ## Response boundary
 
-Current code includes policy evaluation, not an execution backend. Policy
-configuration requires both confirmed compromise and explicit analyst approval.
+Policy configuration requires both confirmed compromise and explicit analyst approval.
 Approval is bound to a fingerprint of the case, action, target and parameters,
 and has a configured lifetime. An action must also have a registered parameter
 validator. The current block-IP validator checks the address, duration and
 protected networks, including IPv4-mapped address forms.
 
-The future authenticated case-review workflow must obtain disposition and
-approval from trusted stored records, not model prose or arbitrary client flags.
+The persisted response workflow obtains disposition and approval from stored
+records, not model prose or arbitrary client flags. Proposals, reviews, dispatch
+claims and outcomes retain case/evidence/policy bindings. The OPNsense adapter
+implements the firewall gateway port; other vendors register independent adapters.
 The `response-policy` CLI disposition flag is only a what-if preview; it creates
 no review record. The separate `case-update` command persists an explicit local
-operator finding with case history. Firewall executors, persisted response
-approvals and authenticated analyst sessions remain to be implemented. The
-model has no shell or firewall execution capability.
+operator finding with case history. The separate analyst API derives audit actors
+from expiring per-analyst bearer credentials and checks operation/case permissions.
+Application-managed block expiry has outage limitations; see
+[response lifecycle](architecture/response-workflow.md) and
+[analyst API authorization](architecture/analyst-api.md). Investigation tools
+provide no shell or firewall mutation capability to the model.
 
 ## Analysis validation
 

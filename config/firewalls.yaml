@@ -1,0 +1,5 @@
+schema_version: 1
+
+# Named targets are configured before execution is enabled. Credentials belong
+# in environment variables, and the external alias must be exclusive to CyberTriage.
+targets: {}

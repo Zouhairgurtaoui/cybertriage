@@ -280,10 +280,14 @@ def _run() -> None:
     from cybertriage.entrypoints.related_events import register_related_event_command, dispatch_related_event_command
     from cybertriage.entrypoints.retrieval import register_retrieval_command, dispatch_retrieval_command
     from cybertriage.entrypoints.graph import register_graph_commands, dispatch_graph_command
+    from cybertriage.entrypoints.responses import register_response_commands, dispatch_response_command
+    from cybertriage.entrypoints.backend import register_backend_commands, dispatch_backend_command
     register_case_commands(commands)
     register_related_event_command(commands)
     register_retrieval_command(commands)
     register_graph_commands(commands)
+    register_response_commands(commands)
+    register_backend_commands(commands)
     args = parser.parse_args()
 
     if dispatch_retrieval_command(args):
@@ -291,6 +295,10 @@ def _run() -> None:
     if dispatch_related_event_command(args, _read_indexer_password):
         return
     if dispatch_graph_command(args):
+        return
+    if dispatch_response_command(args):
+        return
+    if dispatch_backend_command(args):
         return
     if dispatch_case_command(args):
         return

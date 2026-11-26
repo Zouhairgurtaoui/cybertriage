@@ -116,8 +116,11 @@ SQLite and Neo4j do not share a transaction. After publication, the service
 checks the current SQLite case version and returns `needs_resync` if it advanced.
 If that final check fails, the graph may already be published; re-running sync is
 safe. A false `needs_resync` value means the versions matched at the check instant,
-not that future changes are prevented. Synchronization is explicit for now;
-there is no background outbox, automatic worker publication or freshness promise.
+not that future changes are prevented. `graph-sync` publishes explicitly. The
+optional `graph-worker` polls changed case versions with durable per-namespace
+delivery cursors. Failures retain backoff; a cursor-write failure can cause an
+idempotent repeat. This is incremental snapshot delivery, not a transactional
+external outbox or freshness promise. See [backend operation](../operations.md).
 Rebuild by syncing current cases into a new namespace/database. Projection-policy
 upgrades that change same-version content require a new namespace or a genuine
 subsequent case revision; conflicting content is never force-overwritten.

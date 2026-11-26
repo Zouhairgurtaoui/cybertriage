@@ -14,6 +14,9 @@ from cybertriage.domain.triage import AnalysisRecord
 
 
 class SqliteAnalysisQueue:
+    # Fixed adapter-owned table names; no request/config value is used in SQL identifiers.
+    _jobs_table = "analysis_jobs"
+    _results_table = "analysis_job_results"
     def __init__(self, database_path: Path):
         if not database_path.is_file():
             raise JobStorageError(
@@ -24,13 +27,13 @@ class SqliteAnalysisQueue:
         try:
             with closing(self._connect()) as connection:
                 with connection:
-                    connection.execute("""
-                        CREATE TABLE IF NOT EXISTS analysis_job_results (
+                    connection.execute(f"""
+                        CREATE TABLE IF NOT EXISTS {self._results_table} (
                             job_id TEXT PRIMARY KEY,
                             analysis_id TEXT NOT NULL UNIQUE,
 
                             FOREIGN KEY (job_id)
-                                REFERENCES analysis_jobs(job_id)
+                                REFERENCES {self._jobs_table}(job_id)
                                 ON DELETE RESTRICT,
 
                             FOREIGN KEY (analysis_id)
@@ -61,17 +64,18 @@ class SqliteAnalysisQueue:
 
         return connection
 
-    @staticmethod
+    @classmethod
     def _require_claim(
+        cls,
         connection: sqlite3.Connection,
         job: ClaimedAnalysisJob,
         now_text: str,
     ) -> sqlite3.Row:
         # Caller must already hold a BEGIN IMMEDIATE transaction.
         row = connection.execute(
-            """
+            f"""
             SELECT attempt_count
-            FROM analysis_jobs
+            FROM {cls._jobs_table}
             WHERE job_id = ?
               AND alert_record_id = ?
               AND status = 'running'
@@ -114,8 +118,8 @@ class SqliteAnalysisQueue:
                     insert_analysis(connection, record)
 
                     connection.execute(
-                        """
-                        INSERT INTO analysis_job_results (
+                        f"""
+                        INSERT INTO {self._results_table} (
                             job_id,
                             analysis_id
                         )
@@ -125,8 +129,8 @@ class SqliteAnalysisQueue:
                     )
 
                     connection.execute(
-                        """
-                        UPDATE analysis_jobs
+                        f"""
+                        UPDATE {self._jobs_table}
                         SET status = 'completed',
                             claim_token = NULL,
                             lease_expires_at = NULL,
@@ -206,8 +210,8 @@ class SqliteAnalysisQueue:
                     )
 
                     connection.execute(
-                        """
-                        UPDATE analysis_jobs
+                        f"""
+                        UPDATE {self._jobs_table}
                         SET status = ?,
                             available_at = ?,
                             last_error_code = ?,
@@ -262,8 +266,8 @@ class SqliteAnalysisQueue:
                     # Finish exhausted jobs, including workers that crashed
                     # during their final permitted attempt.
                     connection.execute(
-                        """
-                        UPDATE analysis_jobs
+                        f"""
+                        UPDATE {self._jobs_table}
                         SET status = 'failed',
                             last_error_code = CASE
                                 WHEN status = 'running'
@@ -301,9 +305,9 @@ class SqliteAnalysisQueue:
                     )
 
                     row = connection.execute(
-                        """
+                        f"""
                         SELECT job_id, alert_record_id, attempt_count
-                        FROM analysis_jobs
+                        FROM {self._jobs_table}
                         WHERE attempt_count < ?
                           AND (
                               (
@@ -338,8 +342,8 @@ class SqliteAnalysisQueue:
                     )
 
                     connection.execute(
-                        """
-                        UPDATE analysis_jobs
+                        f"""
+                        UPDATE {self._jobs_table}
                         SET status = 'running',
                             attempt_count = attempt_count + 1,
                             claim_token = ?,
@@ -396,8 +400,8 @@ class SqliteAnalysisQueue:
                     )
 
                     connection.execute(
-                        """
-                        UPDATE analysis_jobs
+                        f"""
+                        UPDATE {self._jobs_table}
                         SET lease_expires_at = ?
                         WHERE job_id = ?
                         """,

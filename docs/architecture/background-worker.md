@@ -90,6 +90,21 @@ Report results retain investigation_task, investigation_scope_json, and each
 tool execution. Completion logs include the tool-call count. Empty scopes and
 model responses without tool calls remain visible in the saved provenance.
 
+## Analyst-requested investigations
+
+`requested_investigations` is a separate leased queue for explicit additional
+investigations. It preserves automatic jobs and previous results and retains
+the requesting actor, task, case version and idempotency key. Its fixed adapter
+table identifiers share the lease/retry/heartbeat and atomic completion code;
+no HTTP/config value controls SQL table names. Identity fields are immutable.
+
+The request worker rechecks an open case and active anchor membership, then adds
+the bounded analyst objective to the application-generated plan. It cannot
+expand tool authority. Results use the same exact input coverage and case report
+linking transaction. The authenticated API queues work and returns status/report
+IDs instead of performing model inference in an HTTP request. These additional
+queue paths and the shared-table refactor require regression validation.
+
 Combined authority snapshots use version 2 and add `related_events`; their
 authentication account fields retain the existing contract. Previously saved
 version-1 snapshots remain readable without rewriting reports.
