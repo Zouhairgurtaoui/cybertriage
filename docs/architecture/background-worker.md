@@ -14,7 +14,7 @@
 - Processing may repeat after a crash; inference is not exactly once.
 - Completed reports remain provisional and require analyst review.
 - Manual checks have validated Wazuh delivery and the worker lifecycle.
-  Active Directory report validation is in progress.
+  Real-model report accuracy remains a separate validation concern.
 
 ## Targeted investigations
 
@@ -25,3 +25,62 @@ Targeted selection applies to both claiming and attempt-exhaustion updates,
 leaving other jobs queued. Lease ownership, retry availability, attempt limits,
 and atomic completion still apply. A job that is completed, failed, waiting for
 its retry delay, or owned under a valid lease is not eligible for processing.
+
+## Opt-in read-only investigation
+
+```powershell
+python -m cybertriage worker --investigate --once --job-id JOB_ID
+```
+
+`--investigate` enables the bounded model/tool loop for eligible queued alerts.
+Without the flag, the worker uses ordinary grounded analysis. The same mode is
+available through `analyze-stored --investigate --record-id ALERT_RECORD_ID` for
+an explicitly requested additional report without resetting a completed job.
+
+Indexer settings and credentials are assembled before the worker claims jobs.
+Use the existing environment or `.env.local` configuration. Non-interactive
+workers require CYBERTRIAGE_INDEXER_PASSWORD; an interactive command can use the
+hidden password prompt. No additional model is downloaded by this mode.
+
+## Application-generated task
+
+`ReadOnlyStoredInvestigationPlanner` implements the planner port. The stored-alert
+use case asks it for a task and authentication scope before invoking analysis.
+Raw log text, descriptions, and model prose never become task instructions.
+
+For Windows Security 4624/4625 the planner selects the explicit target account
+and domain. Other Windows Security events prefer a complete explicit initiating
+account/domain, falling back to a complete target identity. Names do not establish
+account type or operator identity. Domain aliases, missing identities, and
+unstructured usernames are not guessed.
+
+The permitted window spans observed member timestamps with five minutes of
+padding on each side. It is not the grouping bucket duration. A group snapshot
+includes every retained member when computing the span. Scope duration is capped
+at 24 hours and each lookup at 10 results. The initial objective requests 5 results.
+The lookup uses indexed Wazuh alert timestamps and may return other hosts for the
+same identity; results do not independently establish a common actor.
+
+Missing or unsupported structured identities produce an empty account scope.
+The report states missing context; an attempted authentication search is rejected
+before reaching the Indexer.
+
+## Per-job authority and provenance
+
+The composition root supplies an invocation-local tool factory. Every stored
+investigation builds scoped tools without mutating shared model/tool state.
+An authentication tool compares its validated request against the account/domain
+set, time interval, and result limit before calling the searcher. Out-of-scope
+requests produce an explicit outside_scope tool error without a backend lookup.
+A scoped model invocation without a scoped factory fails rather than falling
+back to unrestricted tools. Registered capabilities cannot change through scope.
+
+The existing two-request budget, message/context limits, read-only transport,
+lease heartbeat, stale-owner rejection, and atomic job/report completion remain.
+Report results retain investigation_task, investigation_scope_json, and each
+tool execution. Completion logs include the tool-call count. Empty scopes and
+model responses without tool calls remain visible in the saved provenance.
+
+The model cannot label feedback, suppress alerts, approve response actions, or
+execute commands through these tools. Reports remain provisional; scope checks
+bound queries but do not certify the model's interpretation of returned evidence.

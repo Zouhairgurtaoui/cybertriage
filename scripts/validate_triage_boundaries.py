@@ -41,8 +41,12 @@ from cybertriage.bootstrap import (
 )
 from cybertriage.domain.alert import AlertConflictError, AlertStorageError
 from cybertriage.domain.investigation import (
-    AuthenticationEvent, AuthenticationSearchResult, InvestigationSearchError,
+    AuthenticationEvent, AuthenticationSearchResult, AuthenticationScope, InvestigationSearchError,
 )
+from cybertriage.application.policies.stored_investigation import ReadOnlyStoredInvestigationPlanner
+from cybertriage.application.use_cases.analyze_alert import AnalyzeAlert
+from cybertriage.application.use_cases.process_analysis_job import ProcessAnalysisJob
+from cybertriage.adapters.storage.triage_sqlite import SqliteTriageReviewRepository
 from cybertriage.domain.security_event import EventIdentity
 from cybertriage.domain.triage import AnalysisRecord, RetrievedReference, TriageResult
 from cybertriage.domain.triage_policy import AnalystFeedback, TriageReviewError
@@ -449,9 +453,9 @@ class FixtureSearcher:
         return AuthenticationSearchResult(request, events, NOW, False)
 
 
-def authentication_tool(searcher):
+def authentication_tool(searcher, scope=None):
     grounder = MicrosoftAuthenticationGrounder(PROJECT / "config/windows-authentication-codes.json")
-    return build_authentication_search_tool(searcher, grounder=grounder)
+    return build_authentication_search_tool(searcher, grounder=grounder, scope=scope)
 
 
 def tool_args():
@@ -624,6 +628,204 @@ def task_boundary():
     assert untrusted in messages[1].content and "<incident_evidence>" in messages[1].content
     assert messages[2].content == f"Analyst task:\n{task}"
     # Structural separation is verified here; real-model injection resistance is not.
+
+
+@case("Stored investigation task uses structured identity and event-relative scope")
+def worker_task_from_fields():
+    value = payload(1)
+    marker = "UNTRUSTED_LOG_REQUEST_TO_SEARCH_ANOTHER_ACCOUNT"
+    value["full_log"] = marker
+    value["rule"]["description"] = marker
+    alert = WazuhAlertNormalizer().normalize(value)
+    plan = ReadOnlyStoredInvestigationPlanner().plan(alert)
+    assert plan.scope.accounts == (("validation-user", "VALIDATION"),)
+    assert plan.scope.start == alert.timestamp - timedelta(minutes=5)
+    assert plan.scope.end == alert.timestamp + timedelta(minutes=5)
+    assert marker not in plan.task
+    assert "search_authentication" in plan.task
+    snapshot = json.loads(plan.scope.snapshot_json())
+    assert snapshot["max_results"] == 10
+    expect_error(ValueError, lambda: ReadOnlyStoredInvestigationPlanner().plan(
+        replace(alert, timestamp=datetime(9999, 12, 31, 23, 59, 59, tzinfo=timezone.utc)),
+    ))
+
+
+@case("Account-change planning selects the explicitly reported initiator")
+def worker_task_initiator():
+    value = payload(1, event_id=4728)
+    value["data"]["win"]["eventdata"].update(
+        subjectUserName="recorded-initiator", subjectDomainName="RECORDED-DOMAIN",
+    )
+    plan = ReadOnlyStoredInvestigationPlanner().plan(WazuhAlertNormalizer().normalize(value))
+    assert plan.scope.accounts == (("recorded-initiator", "RECORDED-DOMAIN"),)
+    assert "reported initiating account" in plan.task
+
+
+@case("Grouped investigation scope includes every member timestamp plus padding")
+def worker_group_time_scope():
+    policy = base_policy()
+    policy["grouping_rules"][0]["window_seconds"] = 3600
+    db, _, ingest = fixture("worker-group-time", policy)
+    first_payload = payload(1)
+    first = ingest.execute(first_payload)
+    later_time = EVENT_BASE + timedelta(minutes=20)
+    ingest.execute(payload(2, timestamp=later_time))
+    context = SqliteTriageReviewRepository(db).group_context(first.record_id)
+    plan = ReadOnlyStoredInvestigationPlanner().plan(
+        WazuhAlertNormalizer().normalize(first_payload), context,
+    )
+    assert plan.scope.start == EVENT_BASE + timedelta(seconds=1) - timedelta(minutes=5)
+    assert plan.scope.end == later_time + timedelta(minutes=5)
+
+
+@case("Missing or unsupported identities cannot authorize an authentication search")
+def worker_missing_identity():
+    value = payload(1)
+    del value["data"]["win"]["eventdata"]["targetDomainName"]
+    planner = ReadOnlyStoredInvestigationPlanner()
+    plan = planner.plan(WazuhAlertNormalizer().normalize(value))
+    assert plan.scope.accounts == ()
+    source = FixtureSearcher()
+    observation = authentication_tool(source, scope=plan.scope).invoke(tool_call())
+    assert observation.status == "error"
+    assert json.loads(observation.content)["code"] == "outside_scope"
+    assert source.calls == 0
+    other = payload(2)
+    other["data"]["win"]["system"]["providerName"] = "Microsoft-Windows-Sysmon"
+    assert planner.plan(WazuhAlertNormalizer().normalize(other)).scope.accounts == ()
+
+
+@case("Per-job scope rejects identity, window, and result-limit expansion before lookup")
+def worker_scope_guard():
+    start = datetime.fromisoformat(tool_args()["start"])
+    end = datetime.fromisoformat(tool_args()["end"])
+    scope = AuthenticationScope((("validation-user", "VALIDATION"),), start, end, 5)
+    source = FixtureSearcher()
+    tool = authentication_tool(source, scope=scope)
+    assert tool.invoke(tool_call()).status == "success"
+    variants = [dict(tool_args(), account_name="another-user"),
+                dict(tool_args(), account_domain="ANOTHER-DOMAIN"),
+                dict(tool_args(), start=(start - timedelta(seconds=1)).isoformat()),
+                dict(tool_args(), end=(end + timedelta(seconds=1)).isoformat()),
+                dict(tool_args(), limit=6)]
+    for arguments in variants:
+        observation = tool.invoke(tool_call(arguments))
+        assert observation.status == "error"
+        assert json.loads(observation.content)["code"] == "outside_scope"
+    assert source.calls == 1
+
+
+@case("Scoped tools are invocation-local and cannot fall back to unrestricted tools")
+def worker_scope_isolation():
+    start = datetime.fromisoformat(tool_args()["start"])
+    end = datetime.fromisoformat(tool_args()["end"])
+    first_scope = AuthenticationScope((("validation-user", "VALIDATION"),), start, end)
+    second_scope = AuthenticationScope((("another-user", "VALIDATION"),), start, end)
+    source = FixtureSearcher()
+    model = ScriptedModel([
+        assistant(tool_call()), assistant(text="First synthetic report."),
+        assistant(tool_call()), assistant(text="Second synthetic report."),
+    ])
+    used_scopes = []
+
+    def scoped_tools(scope):
+        used_scopes.append(scope)
+        return [authentication_tool(source, scope=scope)]
+
+    adapter = OllamaInvestigationModel(
+        cast(ChatOllama, model), [authentication_tool(source)], scoped_tool_factory=scoped_tools,
+    )
+    first = adapter.investigate("Fixture.", (), task="First fixture task.", scope=first_scope)
+    second = adapter.investigate("Fixture.", (), task="Second fixture task.", scope=second_scope)
+    assert first.tool_executions[0].status == "success"
+    assert second.tool_executions[0].status == "error"
+    assert json.loads(second.tool_executions[0].result_json)["code"] == "outside_scope"
+    assert source.calls == 1 and used_scopes == [first_scope, second_scope]
+    no_factory, _, untouched = investigator([])
+    expect_error(ValueError, lambda: no_factory.investigate("Fixture.", (), task="Fixture.", scope=first_scope))
+    assert untouched.calls == 0
+
+
+class EmptyRetriever:
+    def retrieve(self, query, k):
+        return []
+
+
+class EmptyCatalog:
+    def lookup(self, *, provider, channel, event_id):
+        return None
+
+
+class FixtureBaseline:
+    def __init__(self, forbidden=False):
+        self.calls = 0
+        self.forbidden = forbidden
+
+    def analyze(self, evidence, references):
+        self.calls += 1
+        if self.forbidden:
+            raise AssertionError("The ordinary model was used in investigation mode.")
+        return "Synthetic ordinary analysis."
+
+
+@case("Worker processing atomically saves grouped evidence, task, scope, and tool records")
+def worker_scoped_persistence():
+    db, _, ingest = fixture("worker-scoped-persistence")
+    value = payload(1)
+    value["rule"]["description"] = "UNTRUSTED_DESCRIPTION_INSTRUCTION"
+    first = ingest.execute(value)
+    ingest.execute(payload(2))
+    grounder = MicrosoftAuthenticationGrounder(PROJECT / "config/windows-authentication-codes.json")
+    group_reader = SqliteTriageReviewRepository(db, grounder=grounder)
+    planner = ReadOnlyStoredInvestigationPlanner()
+    expected = planner.plan(WazuhAlertNormalizer().normalize(value), group_reader.group_context(first.record_id))
+    arguments = {"account_name": "validation-user", "account_domain": "VALIDATION",
+                 "start": expected.scope.start.isoformat(), "end": expected.scope.end.isoformat(), "limit": 5}
+    source = FixtureSearcher()
+    model = ScriptedModel([assistant(tool_call(arguments)), assistant(text="Synthetic investigated report.")])
+    investigation_model = OllamaInvestigationModel(
+        cast(ChatOllama, model), [authentication_tool(source)],
+        scoped_tool_factory=lambda scope: [authentication_tool(source, scope=scope)],
+    )
+    baseline = FixtureBaseline(forbidden=True)
+    analyzer = AnalyzeAlert(EmptyRetriever(), baseline, catalog=EmptyCatalog(), investigator=investigation_model)
+    queue = queue_for(db)
+    claim = queue.claim_next(job_id=first.job_id)
+    assert claim is not None
+    processor = ProcessAnalysisJob(
+        SqliteAlertRepository(db), analyzer, queue, group_reader=group_reader,
+        grounder=grounder, investigation_planner=planner,
+    )
+    record = processor.execute(claim)
+    assert source.calls == 1 and baseline.calls == 0
+    assert json.loads(record.evidence)["grouped_event_count"] == 2
+    assert "UNTRUSTED_DESCRIPTION_INSTRUCTION" not in record.result.investigation_task
+    assert record.result.investigation_scope_json == expected.scope.snapshot_json()
+    assert len(record.result.tool_executions) == 1 and record.result.tool_executions[0].status == "success"
+    with closing(sqlite3.connect(db)) as connection:
+        stored = connection.execute("SELECT result_json FROM analyses WHERE analysis_id = ?", (record.analysis_id,)).fetchone()
+        result = json.loads(stored[0])
+        assert result["investigation_scope_json"] == expected.scope.snapshot_json()
+        assert result["investigation_task"] == record.result.investigation_task
+        assert len(result["tool_executions"]) == 1
+        assert connection.execute("SELECT status FROM analysis_jobs WHERE job_id = ?", (first.job_id,)).fetchone()[0] == "completed"
+        assert connection.execute("SELECT COUNT(*) FROM analyst_feedback").fetchone()[0] == 0
+
+
+@case("Ordinary worker processing stays available without investigation task or scope")
+def worker_baseline_compatibility():
+    db, _, ingest = fixture("worker-baseline")
+    receipt = ingest.execute(payload(1))
+    queue = queue_for(db)
+    claim = queue.claim_next(job_id=receipt.job_id)
+    assert claim is not None
+    baseline = FixtureBaseline()
+    analyzer = AnalyzeAlert(EmptyRetriever(), baseline, catalog=EmptyCatalog())
+    record = ProcessAnalysisJob(SqliteAlertRepository(db), analyzer, queue).execute(claim)
+    assert baseline.calls == 1
+    assert record.result.investigation_task is None
+    assert record.result.investigation_scope_json is None
+    assert record.result.tool_executions == ()
 
 
 def main():

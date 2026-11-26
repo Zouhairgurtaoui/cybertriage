@@ -21,6 +21,7 @@ class TriageResult:
     event_definition: SecurityEventDefinition | None = None
     tool_executions: tuple[ToolExecution, ...] = ()
     investigation_task: str | None = None
+    investigation_scope_json: str | None = None
 
 @dataclass(frozen=True)
 class AnalysisRecord:

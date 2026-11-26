@@ -35,6 +35,7 @@ from cybertriage.application.use_cases.analyze_alert import AnalyzeAlert
 from cybertriage.application.use_cases.ingest_knowledge import IngestKnowledge
 from cybertriage.application.use_cases.preview_response_action import PreviewResponseAction
 from cybertriage.domain.configuration import KnowledgeSettings
+from cybertriage.domain.investigation import AuthenticationScope
 from cybertriage.application.use_cases.analyze_stored_alert import (
     AnalyzeStoredAlert,
 )
@@ -147,12 +148,17 @@ def build_analyze_alert(
         searcher = build_authentication_search(
             password_supplier=password_supplier,
         )
+        authentication_grounder = build_authentication_grounder()
+
+        def tools_for_scope(scope: AuthenticationScope | None):
+            return [build_authentication_search_tool(
+                searcher, grounder=authentication_grounder, scope=scope,
+            )]
 
         investigator = OllamaInvestigationModel(
             model=ollama,
-            tools=[
-                build_authentication_search_tool(searcher, grounder=build_authentication_grounder()),
-            ],
+            tools=tools_for_scope(None),
+            scoped_tool_factory=tools_for_scope,
         )
 
     catalog = (
@@ -279,6 +285,9 @@ def build_analyze_stored_alert(
     catalog_path: Path,
     model_name: str | None = None,
     sources_config_path: Path = DEFAULT_SOURCES_CONFIG,
+    *,
+    investigate: bool = False,
+    password_supplier: Callable[[], str] | None = None,
 ) -> AnalyzeStoredAlert:
     from cybertriage.adapters.storage.alerts_sqlite import (
         SqliteAlertRepository,
@@ -296,6 +305,7 @@ def build_analyze_stored_alert(
     writer = SqliteAnalysisWriter(alerts_database_path)
     from cybertriage.adapters.storage.triage_sqlite import SqliteTriageReviewRepository
     grounder = build_authentication_grounder()
+    from cybertriage.application.policies.stored_investigation import ReadOnlyStoredInvestigationPlanner
 
     return AnalyzeStoredAlert(
         reader=reader,
@@ -304,10 +314,13 @@ def build_analyze_stored_alert(
             catalog_path=catalog_path,
             model_name=model_name,
             sources_config_path=sources_config_path,
+            investigate=investigate,
+            password_supplier=password_supplier,
         ),
         writer=writer,
         group_reader=SqliteTriageReviewRepository(alerts_database_path, grounder=grounder),
         grounder=grounder,
+        investigation_planner=ReadOnlyStoredInvestigationPlanner() if investigate else None,
     )
 
 def build_analysis_worker(
@@ -321,6 +334,8 @@ def build_analysis_worker(
     max_attempts: int = 3,
     retry_delay_seconds: int = 30,
     poll_seconds: float = 2.0,
+    investigate: bool = False,
+    password_supplier: Callable[[], str] | None = None,
 ) -> AnalysisWorker:
     from cybertriage.adapters.storage.alerts_sqlite import (
         SqliteAlertRepository,
@@ -349,6 +364,7 @@ def build_analysis_worker(
     queue = SqliteAnalysisQueue(alerts_database_path)
     from cybertriage.adapters.storage.triage_sqlite import SqliteTriageReviewRepository
     grounder = build_authentication_grounder()
+    from cybertriage.application.policies.stored_investigation import ReadOnlyStoredInvestigationPlanner
 
     processor = ProcessAnalysisJob(
         reader=reader,
@@ -357,10 +373,13 @@ def build_analysis_worker(
             catalog_path=catalog_path,
             model_name=model_name,
             sources_config_path=sources_config_path,
+            investigate=investigate,
+            password_supplier=password_supplier,
         ),
         completer=queue,
         group_reader=SqliteTriageReviewRepository(alerts_database_path, grounder=grounder),
         grounder=grounder,
+        investigation_planner=ReadOnlyStoredInvestigationPlanner() if investigate else None,
     )
 
     return AnalysisWorker(

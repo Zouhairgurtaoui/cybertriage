@@ -11,6 +11,7 @@ from cybertriage.application.ports.investigation import (
 )
 from cybertriage.domain.investigation import (
     AuthenticationSearchRequest,
+    AuthenticationScope,
     InvestigationSearchError,
 )
 
@@ -83,6 +84,7 @@ def build_authentication_search_tool(
     searcher: AuthenticationEventSearcher,
     *,
     grounder: AuthenticationResultGrounder,
+    scope: AuthenticationScope | None = None,
 ) -> StructuredTool:
     """Adapt the authentication search port to a LangChain tool."""
 
@@ -107,6 +109,13 @@ def build_authentication_search_tool(
                 "Provide a valid account, domain, timezone-aware "
                 "timestamps, and a time window of at most 24 hours.",
             ) from None
+
+        if scope is not None and not scope.allows(request):
+            raise _tool_error(
+                "outside_scope",
+                "The requested identity, time window, or result limit is outside "
+                "this investigation's permitted scope. No search was executed.",
+            )
 
         try:
             result = searcher.search(request)

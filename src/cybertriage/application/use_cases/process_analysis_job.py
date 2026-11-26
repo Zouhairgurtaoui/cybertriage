@@ -1,4 +1,5 @@
 from cybertriage.application.ports.alerts import AlertReader
+from cybertriage.application.ports.agent import StoredAlertInvestigationPlanner
 from cybertriage.application.ports.jobs import JobCompleter
 from cybertriage.application.ports.triage_policy import AlertEvidenceGrounder, GroupEvidenceReader
 from cybertriage.application.ports.triage import AlertAnalyzer
@@ -31,12 +32,14 @@ class ProcessAnalysisJob:
         *,
         group_reader: GroupEvidenceReader | None = None,
         grounder: AlertEvidenceGrounder | None = None,
+        investigation_planner: StoredAlertInvestigationPlanner | None = None,
     ):
         self._reader = reader
         self._analyzer = analyzer
         self._completer = completer
         self._group_reader = group_reader
         self._grounder = grounder
+        self._investigation_planner = investigation_planner
 
     def execute(self, job: ClaimedAnalysisJob) -> AnalysisRecord:
         investigation = AnalyzeStoredAlert(
@@ -45,6 +48,7 @@ class ProcessAnalysisJob:
             writer=_JobCompletionWriter(self._completer, job),
             group_reader=self._group_reader,
             grounder=self._grounder,
+            investigation_planner=self._investigation_planner,
         )
 
         return investigation.execute(job.alert_record_id)

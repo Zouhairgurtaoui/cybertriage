@@ -60,8 +60,8 @@ reads `config/response_actions.yaml` through a separate application policy.
 Authenticated Wazuh ingestion, SQLite-backed background analysis, and a read-only
 authentication search are implemented. The analysis CLI supports opt-in model
 tool calling. There is no firewall executor or approval-storage workflow yet.
-Background-worker investigation tools and the analyst web application remain
-planned. See
+Background workers support opt-in scoped authentication investigation. The analyst
+web application remains planned. See
 [implementation status](docs/implementation-status.md).
 
 Ingestion includes auditable triage and candidate grouping before job scheduling.
@@ -258,8 +258,26 @@ saved report to distinguish
 successful searches from errors or a run without tool calls. A completed report
 does not by itself verify successful evidence retrieval.
 
-Investigation does not authorize or execute response actions. Background workers
-continue to use ordinary analysis until investigation is explicitly integrated.
+Investigation does not authorize or execute response actions.
+
+For a stored alert or queued job, enable application-generated scoped investigation:
+
+```powershell
+python -m cybertriage analyze-stored --record-id ALERT_RECORD_ID --investigate --output data/reports/stored-investigation.json
+python -m cybertriage worker --once --job-id JOB_ID --investigate
+```
+
+The worker defaults to ordinary analysis. In investigation mode, the application
+selects a complete structured account/domain and a bounded event-relative time
+window. Each tool request is checked against that per-job scope before reaching
+the Indexer. Missing identities permit no authentication searches. The saved
+result includes the generated task, scope snapshot, and tool execution records.
+
+Use an eligible pending job for a targeted worker check; completed jobs are not
+reset. Continuous `worker --investigate` processes eligible queued jobs with the
+same per-job limits. Non-interactive workers require the Indexer password in
+environment configuration. Keep the Indexer connection/tunnel available for live
+searches. See [background investigations](docs/architecture/background-worker.md).
 
 ## Documentation
 

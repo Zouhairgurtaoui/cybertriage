@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Literal
+from cybertriage.domain.investigation import AuthenticationScope
 
 
 @dataclass(frozen=True)
@@ -15,6 +16,12 @@ class ToolExecution:
 class InvestigationReport:
     analysis: str
     tool_executions: tuple[ToolExecution, ...]
+
+
+@dataclass(frozen=True)
+class StoredInvestigationPlan:
+    task: str
+    scope: AuthenticationScope
 
 
 def validate_investigation_task(value: object) -> str:

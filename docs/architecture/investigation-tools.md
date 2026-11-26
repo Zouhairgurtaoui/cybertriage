@@ -106,8 +106,9 @@ Failure details are included in the query and result mapping. A live failed-logo
 search verified preservation of status_code, substatus_code, and failure_reason.
 The analysis CLI supports opt-in investigation. A live model-requested search
 retrieved the expected failed-logon event and saved its execution record.
-Validation of the new grounding block and background-worker tool integration
-remain pending.
+Live grounding delivery has been verified separately from report interpretation.
+Scoped background-worker integration is implemented; its new validation cases
+and live worker operation remain pending.
 The searches do not independently verify that write operations are denied.
 
 ## Live validation — 2026-11-25
@@ -196,9 +197,17 @@ The CLI prints tool execution names, statuses, and call IDs. Detailed records
 are included in the JSON report selected with --output. Existing JSON report
 storage serializes these records without a database schema migration.
 
-Background-worker tool integration and validation of the new grounding output
-remain pending. Background workers use ordinary analysis with grouped evidence
-and applicable sourced code definitions.
+Background workers and stored-alert analysis support opt-in scoped investigation
+through --investigate. Ordinary analysis remains the default. The application
+builds the task from structured event fields; invocation-local tools enforce its
+account/domain, time, and result constraints before searching. Missing identities
+authorize no authentication lookups. The task, scope snapshot, and execution
+records are included in saved report results.
+
+See [background investigations](background-worker.md) for the mode and scope
+lifecycle. Real-model scoped worker validation remains pending. Live CLI runs
+have delivered correct grounding data while still producing unsupported prose;
+successful tool execution is not semantic validation.
 
 Pre-analysis scheduling, candidate alert grouping, analyst feedback, and
 suppression-quality metrics are documented in [alert triage](triage.md).

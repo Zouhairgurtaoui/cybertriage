@@ -21,6 +21,8 @@ Implemented code paths:
 - Authenticated Wazuh ingestion and integrity-checked SQLite alert storage.
 - Leased background jobs with heartbeat, retries, and atomic report completion.
 - Opt-in CLI investigation with a bounded read-only authentication tool.
+- Opt-in scoped background/stored-alert investigation with application-generated
+  tasks and persisted query authority and tool execution records.
 - Computed authentication search summaries and sourced status-code definitions.
 - Revisioned pre-analysis triage with retained suppressed alerts and audit history.
 - Bounded candidate groups that share pending jobs and supply full member summaries.
@@ -52,7 +54,7 @@ application data; the model is not required to generate JSON.
 ## Remaining backend work
 
 - Cross-technique incident/case correlation and Neo4j projection.
-- Background-worker tool-calling integration and additional investigation tools.
+- Live scoped-worker validation and additional investigation tools.
 - Real-model grounding/report-quality evaluation and operational workload validation.
 - Authenticated analyst review, stored approvals and audit records.
 - Allowlisted response executors connected to the response policy.

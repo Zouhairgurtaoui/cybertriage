@@ -1,5 +1,5 @@
 import json
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Literal
 
 from langchain_core.messages import (
@@ -18,6 +18,7 @@ from cybertriage.domain.agent import (
     validate_investigation_task,
 )
 from cybertriage.domain.triage import RetrievedReference
+from cybertriage.domain.investigation import AuthenticationScope
 
 
 MAX_TOOL_CALLS = 2
@@ -160,6 +161,8 @@ class OllamaInvestigationModel:
         self,
         model: ChatOllama,
         tools: Sequence[StructuredTool],
+        *,
+        scoped_tool_factory: Callable[[AuthenticationScope], Sequence[StructuredTool]] | None = None,
     ):
         if not tools:
             raise ValueError("Register at least one investigation tool.")
@@ -171,6 +174,7 @@ class OllamaInvestigationModel:
 
         self._model = model
         self._model_with_tools = model.bind_tools(list(tools))
+        self._scoped_tool_factory = scoped_tool_factory
 
     def investigate(
         self,
@@ -178,8 +182,21 @@ class OllamaInvestigationModel:
         references: tuple[RetrievedReference, ...],
         *,
         task: str,
+        scope: AuthenticationScope | None = None,
     ) -> InvestigationReport:
         task = validate_investigation_task(task)
+        if scope is not None and not isinstance(scope, AuthenticationScope):
+            raise ValueError("Investigation scope must be an AuthenticationScope.")
+        tools = self._tools
+        model_with_tools = self._model_with_tools
+        if scope is not None:
+            if self._scoped_tool_factory is None:
+                raise ValueError("Scoped investigation requires a scoped tool factory.")
+            scoped_tools = list(self._scoped_tool_factory(scope))
+            tools = {tool.name: tool for tool in scoped_tools}
+            if len(tools) != len(scoped_tools) or set(tools) != set(self._tools):
+                raise ValueError("Scoped tools must preserve the registered capabilities.")
+            model_with_tools = self._model.bind_tools(scoped_tools)
 
         if not evidence.strip():
             raise ValueError("Incident evidence must not be empty.")
@@ -222,7 +239,7 @@ class OllamaInvestigationModel:
             _check_context(messages)
 
             if allow_tools:
-                raw_answer = self._model_with_tools.invoke(messages)
+                raw_answer = model_with_tools.invoke(messages)
             else:
                 # Use the original model without tool definitions.
                 raw_answer = self._model.invoke(messages)
@@ -287,7 +304,7 @@ class OllamaInvestigationModel:
                     allow_nan=False,
                 )
                 request_key = (name, arguments_json)
-                tool = self._tools.get(name)
+                tool = tools.get(name)
 
                 if tool is None:
                     observation = _error_result(

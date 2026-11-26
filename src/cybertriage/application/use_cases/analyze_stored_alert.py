@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from cybertriage.application.ports.alerts import AlertReader
+from cybertriage.application.ports.agent import StoredAlertInvestigationPlanner
 from cybertriage.application.ports.triage_policy import AlertEvidenceGrounder, GroupEvidenceReader
 from cybertriage.application.ports.triage import (
     AlertAnalyzer,
@@ -36,7 +37,7 @@ def _format_evidence(alert: SecurityAlert, grounding: Mapping[str, object] | Non
 
     return (
         "The following is one normalized alert received from Wazuh.\n"
-        "This operation does not search for additional incident events.\n"
+        "Any additional searches are recorded separately in tool execution records.\n"
         "Wazuh rule metadata, including MITRE IDs, provides classification "
         "context and does not independently confirm an attack.\n\n"
         f"{serialized}"
@@ -52,12 +53,14 @@ class AnalyzeStoredAlert:
         *,
         group_reader: GroupEvidenceReader | None = None,
         grounder: AlertEvidenceGrounder | None = None,
+        investigation_planner: StoredAlertInvestigationPlanner | None = None,
     ):
         self._reader = reader
         self._analyzer = analyzer
         self._writer = writer
         self._group_reader = group_reader
         self._grounder = grounder
+        self._investigation_planner = investigation_planner
 
     def execute(
         self,
@@ -84,11 +87,16 @@ class AnalyzeStoredAlert:
             alert, self._grounder.ground_alert(alert) if self._grounder else None,
         )
 
-        result = self._analyzer.execute(
-            evidence=evidence,
-            retrieval_query=query,
-            event=alert.event,
-        )
+        if self._investigation_planner is None:
+            result = self._analyzer.execute(
+                evidence=evidence, retrieval_query=query, event=alert.event,
+            )
+        else:
+            plan = self._investigation_planner.plan(alert, group_context)
+            result = self._analyzer.execute(
+                evidence=evidence, retrieval_query=query, event=alert.event,
+                investigation_task=plan.task, investigation_scope=plan.scope,
+            )
 
         record = AnalysisRecord(
             analysis_id=uuid4().hex,

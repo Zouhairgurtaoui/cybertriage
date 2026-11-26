@@ -161,3 +161,33 @@ does not establish real-model instruction following, injection resistance,
 investigation accuracy, representative suppression quality, or deployment
 performance. Validate grounded reports against retained live evidence and assess
 deployment transport, backup/recovery, and realistic workloads separately.
+
+## Scoped worker extension — validation pending
+
+The harness now contains 37 grouped checks. The eight added cases cover:
+
+- Application-generated tasks derived from structured identity/time fields.
+- Initiating-account selection for account changes.
+- Group time spans covering every retained member.
+- Missing/unsupported identity denial and account/window/result scope enforcement.
+- Invocation-local scoped tools and rejection of an absent scoped factory.
+- Atomic persistence of grouped evidence, task, scope, and execution records.
+- Compatibility of ordinary worker analysis without investigation mode.
+
+```powershell
+python scripts/validate_triage_boundaries.py
+```
+
+These additions use scripted models/searchers and are not recorded as passed
+until executed. For a live scoped worker check, select an eligible pending job:
+
+```powershell
+python -m cybertriage worker --once --job-id JOB_ID --investigate
+```
+
+Inspect the saved result's investigation_task, investigation_scope_json, and
+tool_executions, along with group member source IDs in the record evidence.
+Compare every executed request to its permitted account/domain, interval, and
+limit. A completed job without tool calls does not establish successful tool
+execution. An empty identity scope should produce no backend authentication
+lookups. Scope enforcement does not certify real-model report interpretation.

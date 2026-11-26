@@ -6,6 +6,7 @@ from cybertriage.application.ports.triage import (
 )
 from cybertriage.domain.agent import ToolExecution, validate_investigation_task
 from cybertriage.domain.security_event import EventIdentity
+from cybertriage.domain.investigation import AuthenticationScope
 from cybertriage.domain.triage import RetrievedReference, TriageResult
 
 
@@ -35,12 +36,13 @@ class AnalyzeAlert:
         event: EventIdentity | None = None,
         *,
         investigation_task: str | None = None,
+        investigation_scope: AuthenticationScope | None = None,
     ) -> TriageResult:
         task: str | None = None
 
         if self._investigator is not None:
             task = validate_investigation_task(investigation_task)
-        elif investigation_task is not None:
+        elif investigation_task is not None or investigation_scope is not None:
             raise ValueError(
                 "An investigation task requires investigation mode."
             )
@@ -137,6 +139,7 @@ class AnalyzeAlert:
                 evidence=model_evidence,
                 references=reference_tuple,
                 task=task,
+                scope=investigation_scope,
             )
             analysis = investigation.analysis
             tool_executions = investigation.tool_executions
@@ -152,4 +155,7 @@ class AnalyzeAlert:
             event_definition=definition,
             tool_executions=tool_executions,
             investigation_task=task,
+            investigation_scope_json=(
+                investigation_scope.snapshot_json() if investigation_scope is not None else None
+            ),
         )

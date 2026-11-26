@@ -156,9 +156,10 @@ class AnalysisWorker:
             record = self._processor.execute(job)
 
             logger.info(
-                "Completed job=%s analysis=%s",
+                "Completed job=%s analysis=%s tool_calls=%s",
                 job.job_id,
                 record.analysis_id,
+                len(record.result.tool_executions),
             )
 
         except JobLeaseLostError:

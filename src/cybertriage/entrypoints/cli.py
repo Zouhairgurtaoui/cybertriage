@@ -28,6 +28,14 @@ def read_evidence(path: Path) -> str:
     return evidence
 
 
+def _read_indexer_password() -> str:
+    import getpass
+
+    if not sys.stdin.isatty():
+        raise ValueError("Set CYBERTRIAGE_INDEXER_PASSWORD for non-interactive investigation.")
+    return getpass.getpass("Read-only Indexer password: ")
+
+
 def _run() -> None:
     parser = argparse.ArgumentParser(
         prog="cybertriage",
@@ -160,6 +168,7 @@ def _run() -> None:
         help="Investigate a received alert stored in SQLite.",
     )
     stored.add_argument("--record-id", required=True)
+    stored.add_argument("--investigate", action="store_true", help="Enable application-scoped read-only tool calls.")
     stored.add_argument("--query")
     stored.add_argument("--model")
     stored.add_argument("--output", type=Path)
@@ -209,6 +218,7 @@ def _run() -> None:
         default=Path("config/sources.yaml"),
     )
     worker.add_argument("--model")
+    worker.add_argument("--investigate", action="store_true", help="Enable application-scoped read-only tool calls for queued alerts.")
     worker.add_argument("--once", action="store_true")
     worker.add_argument(
         "--job-id",
@@ -452,6 +462,8 @@ def _run() -> None:
             catalog_path=args.catalog.resolve(),
             model_name=args.model,
             sources_config_path=args.sources_config,
+            investigate=args.investigate,
+            password_supplier=_read_indexer_password if args.investigate else None,
         )
 
         print(
@@ -477,6 +489,12 @@ def _run() -> None:
 
         print("Model analysis (provisional; analyst review required):")
         print(result.analysis)
+        if args.investigate:
+            print("\nInvestigation tool activity:")
+            if not result.tool_executions:
+                print("No tools were requested by the model.")
+            for execution in result.tool_executions:
+                print(f"- {execution.tool_name}: {execution.status} (call ID: {execution.call_id})")
         print("\nRetrieved references:")
 
         if not result.references:
@@ -513,6 +531,8 @@ def _run() -> None:
             max_attempts=args.max_attempts,
             retry_delay_seconds=args.retry_delay_seconds,
             poll_seconds=args.poll_seconds,
+            investigate=args.investigate,
+            password_supplier=_read_indexer_password if args.investigate else None,
         )
 
         stop = Event()
