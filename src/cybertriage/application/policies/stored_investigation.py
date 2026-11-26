@@ -6,7 +6,8 @@ from datetime import datetime, timedelta, timezone
 from cybertriage.application.policies.alert_triage import decoded_field
 from cybertriage.domain.agent import StoredInvestigationPlan, validate_investigation_task
 from cybertriage.domain.alert import SecurityAlert
-from cybertriage.domain.investigation import AuthenticationScope
+from cybertriage.domain.related_events import InvestigationScope, RelatedEventScope
+from cybertriage.application.policies.event_families import FAMILY_IDENTITIES
 
 
 class ReadOnlyStoredInvestigationPlanner:
@@ -29,6 +30,8 @@ class ReadOnlyStoredInvestigationPlanner:
                 timestamp = datetime.fromisoformat(member["timestamp"])
                 if timestamp.utcoffset() is None:
                     raise ValueError("Grouped timestamps must include a timezone.")
+                if member.get("source_instance") != alert.source_instance or member.get("agent_id") != alert.agent_id:
+                    raise ValueError("Generated group contains a different manager or host.")
                 observed_times.append(timestamp.astimezone(timezone.utc))
 
         accounts: tuple[tuple[str, str], ...] = ()
@@ -45,7 +48,7 @@ class ReadOnlyStoredInvestigationPlanner:
                 domain = decoded_field(data, f"win.eventdata.{domain_field}")
                 if name is not None and domain is not None:
                     # Search identity is explicit. Do not split names or guess domain aliases.
-                    if name != name.strip() or domain != domain.strip():
+                    if any(value != value.strip() or value == "-" or len(value) > 256 or not value.isprintable() for value in (name, domain)):
                         continue
                     accounts = ((name, domain),)
                     role = description
@@ -53,7 +56,10 @@ class ReadOnlyStoredInvestigationPlanner:
 
         padding = timedelta(seconds=self._context_seconds)
         try:
-            scope = AuthenticationScope(accounts, min(observed_times) - padding, max(observed_times) + padding)
+            start, end = min(observed_times) - padding, max(observed_times) + padding
+            scope = InvestigationScope(accounts, start, end, related_events=RelatedEventScope(
+                ((alert.source_instance, alert.agent_id),), start, end,
+            ))
         except OverflowError as error:
             raise ValueError("Alert timestamps exceed the supported investigation window.") from error
         task = (
@@ -64,10 +70,19 @@ class ReadOnlyStoredInvestigationPlanner:
             f"Identity selection: {role}. "
             "Account names do not identify the operator or establish account type. "
         )
+        family = next((name for name in ("account_changes", "group_changes", "process_activity")
+                       if alert.event in FAMILY_IDENTITIES[name]), None)
+        if family is not None:
+            task += (
+                f"Start by calling search_related_events for family {family}, the authorized manager and agent, "
+                "and the full permitted interval, limit 3. Related-event filters are optional; do not infer account "
+                "roles or omit group-member activity by guessing an account filter. "
+            )
         if accounts:
             task += (
-                "Start by calling search_authentication for the permitted account/domain and full permitted "
-                "interval, limit 5. A second narrower lookup is optional within the same scope. "
+                ("Then consider calling " if family else "Start by calling ") +
+                "search_authentication for the permitted account/domain and full permitted "
+                "interval, limit 5. At most two total tool requests are available. "
                 "Search results may include other hosts; do not assume a common actor. "
             )
         else:
@@ -75,6 +90,10 @@ class ReadOnlyStoredInvestigationPlanner:
                 "Authentication lookup is disabled for this investigation. Do not invent an identity or "
                 "request an authentication search. State which structured identity fields are needed. "
             )
+            if family is None:
+                task += "Call search_related_events with family all, the authorized manager/agent and full interval, limit 3, for available host context. "
+        if family is None and accounts:
+            task += "If needed, use a second search_related_events request for account_changes or process_activity on the authorized host, limit 3. "
         task += (
             "Use returned coverage and sourced definitions, cite evidence IDs, and state uncertainty. "
             "Only currently indexed activity is visible; future parts of a permitted interval are not evidence of absence. "

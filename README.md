@@ -232,14 +232,48 @@ Store local credentials in this ignored file; do not commit passwords.
 
 Inspect command usage with:
 `python -m cybertriage search-authentication --help`
+and `python -m cybertriage search-events --help`.
 
 Searches require explicit timezone-aware start and end timestamps.
 Live searches require the Indexer to be reachable.
 
+### Related host events
+
+Search account changes, group changes or process activity on an exact manager
+and agent. This operator command uses the Indexer directly; Ollama is not needed:
+
+```powershell
+python -m cybertriage search-events --source-instance wazuh-server --agent-id 001 --family account_changes --start "2026-11-25T00:00:00Z" --end "2026-11-26T00:00:00Z" --limit 5
+```
+
+Replace the manager, agent and interval with the investigation's actual scope.
+Families are `all`, `authentication`, `account_changes`, `group_changes` and
+`process_activity`. `all` also supports non-Windows host alerts. Optional
+`--account`/`--domain`, `--source-ip`, `--process-guid` and `--logon-id` narrow
+the results. Use `--output PATH` to save the result.
+
+The response preserves source IDs and field roles, actual search filters,
+truncation and coverage. It searches indexed alerts, not complete event logs;
+empty results do not prove an absence of activity. Results are candidate
+context, not automatic case attachments or confirmed relationships.
+
+Workers and `analyze-stored --investigate` now register both
+`search_authentication` and `search_related_events`. The stored-alert planner
+supplies the related tool's exact manager/agent and event-relative interval.
+Restart existing workers to load the additional capability.
+
+Offline checks require neither the Indexer nor Ollama:
+
+```powershell
+python scripts/validate_related_events.py
+```
+
+See [related-event profiles, filters and authority](docs/architecture/related-events.md).
+
 ## Read-only investigation
 
 Add `--investigate` and an explicit `--task` to `analyze` to enable bounded
-authentication searches. `--task` is required in investigation mode and is
+read-only investigation. `--task` is required in investigation mode and is
 rejected without `--investigate`. Tasks are limited to 4,000 UTF-8 bytes.
 The command requires the configured Indexer connection and credentials,
 populated knowledge collections, and the configured models available in Ollama.
@@ -250,6 +284,13 @@ from the evidence file; instructions embedded in logs are treated as data.
 The model may request up to two tools. Saved JSON reports include the task
 and tool execution records. The CLI displays each
 recorded tool's name, status, and call ID.
+
+For related-event searches from a file-based analysis, also supply
+`--source-instance`, `--agent-id`, `--start` and `--end`. These CLI arguments
+authorize the host/time scope independently of evidence text. Add `--account`
+and `--domain` together if authentication searches are also required in that
+scope. Without host/time authority, the related tool returns `scope_required`;
+the existing analyst-directed authentication workflow remains available.
 
 ```powershell
 python -m cybertriage analyze --evidence examples/alerts/authentication-investigation.txt --event-id 4625 --provider Microsoft-Windows-Security-Auditing --channel Security --investigate --task "Call search_authentication for account zguertaoui in domain CORP from 2026-09-01T02:24:50Z inclusive to 2026-09-01T02:25:00Z exclusive, limit 5. Use the returned evidence to explain the failed logon and state remaining uncertainty." --output data/reports/authentication-investigation.json

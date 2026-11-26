@@ -84,6 +84,8 @@ def _run() -> None:
         "--task",
         help="Analyst investigation instruction; requires --investigate.",
     )
+    from cybertriage.entrypoints.related_events import add_investigation_scope_arguments
+    add_investigation_scope_arguments(analyze)
     ingest = commands.add_parser(
         "ingest",
         help="Fetch, chunk, and store reference knowledge.",
@@ -272,9 +274,13 @@ def _run() -> None:
     triage_policy.add_argument("--config", type=Path, default=Path("config/triage.yaml"))
 
     from cybertriage.entrypoints.cases import register_case_commands, dispatch_case_command
+    from cybertriage.entrypoints.related_events import register_related_event_command, dispatch_related_event_command
     register_case_commands(commands)
+    register_related_event_command(commands)
     args = parser.parse_args()
 
+    if dispatch_related_event_command(args, _read_indexer_password):
+        return
     if dispatch_case_command(args):
         return
 
@@ -632,6 +638,8 @@ def _run() -> None:
         return
 
     evidence = read_evidence(args.evidence)
+    from cybertriage.entrypoints.related_events import manual_investigation_scope
+    investigation_scope = manual_investigation_scope(args)
 
 
     event_fields = (args.event_id, args.provider, args.channel)
@@ -664,7 +672,7 @@ def _run() -> None:
 
     use_case = build_analyze_alert(
         database_directory=args.database.resolve(),
-        catalog_path=args.catalog.resolve() if event is not None else None,
+        catalog_path=args.catalog.resolve() if event is not None or (args.investigate and args.catalog.is_file()) else None,
         model_name=args.model,
         sources_config_path=args.sources_config,
         investigate=args.investigate,
@@ -682,6 +690,7 @@ def _run() -> None:
         retrieval_query=args.query,
         event=event,
         investigation_task=args.task,
+        investigation_scope=investigation_scope,
     )
     if args.output is not None:
         from dataclasses import asdict

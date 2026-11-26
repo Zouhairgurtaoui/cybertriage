@@ -60,8 +60,14 @@ and coverage. The maximum allowed window is not the executed window.
 Use supplied [D:...] definitions for code meanings and cite their IDs.
 If a code or %% resource token has no supplied definition, leave its meaning
 unknown. A general event definition does not define all its status codes.
-No result from this authentication tool establishes whether a lockout event
-exists: only its explicitly listed event IDs were searched.
+Each tool searches only its explicitly listed event types and filters.
+The authentication tool searches only 4624/4625. Related-event profiles search
+their listed identities; all searches visible host alerts, not raw archives.
+No result establishes that unsearched or uncollected activity did not occur.
+For related events, preserve target, subject, group-member and process-field
+roles. A subject session is not the target account's session. A matched process
+GUID or logon-ID field alone does not prove actor identity or a causal chain.
+Respect truncated fields, omitted fields and has_more when stating limitations.
 Loopback addresses, interactive logon types, and lack of a lockout do not
 establish benign intent or exclude compromise.
 

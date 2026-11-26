@@ -21,6 +21,11 @@ Implemented code paths:
 - Authenticated Wazuh ingestion and integrity-checked SQLite alert storage.
 - Leased background jobs with heartbeat, retries, and atomic report completion.
 - Opt-in CLI investigation with a bounded read-only authentication tool.
+- Related-event Indexer search and model tool with explicit manager/agent/time
+  authority, account/group/process profiles, generic host context, exact optional
+  filters, bounded field projections and source provenance.
+- Stored-alert family-aware planning and combined version-2 account/host scopes;
+  both read-only tools are registered without changing the two-request budget.
 - Opt-in scoped background/stored-alert investigation with application-generated
   tasks and persisted query authority and tool execution records.
 - Computed authentication search summaries and sourced status-code definitions.
@@ -61,6 +66,7 @@ application data; the model is not required to generate JSON.
 
 - Automatic cross-technique case correlation and Neo4j/Cyber Kill Chain projection.
 - Live scoped-worker validation and additional investigation tools.
+- Retrieval relevance improvements and controlled, cached live web retrieval.
 - Real-model grounding/report-quality evaluation and operational workload validation.
 - Authenticated analyst review, stored approvals and audit records.
 - Allowlisted response executors connected to the response policy.
@@ -102,4 +108,10 @@ transaction rollback, pagination and history constraints with isolated fixtures.
 It has been added but has not yet been executed. The scoped worker extension
 to the boundary suite also remains pending execution; the recorded 29-check
 result does not include either extension.
+
+`scripts/validate_related_events.py` adds 16 isolated check groups for request
+and runtime authority, query construction, source mapping, role preservation,
+projection/truncation, tool errors and budgets, invocation isolation and persisted
+worker tool provenance. They have not yet been executed. Live Indexer mappings
+and model selection/interpretation of the new capability remain unvalidated.
 

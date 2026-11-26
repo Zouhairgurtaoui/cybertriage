@@ -6,6 +6,9 @@ from typing import Callable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from cybertriage.application.services.case_management import CaseManagement
+    from cybertriage.adapters.wazuh.indexer_http import WazuhIndexerHttpClient
+
+from cybertriage.application.ports.related_events import RelatedEventSearcher
 
 from langchain_ollama import ChatOllama
 
@@ -138,6 +141,7 @@ def build_analyze_alert(
         client_kwargs={"timeout": 180.0},
     )
 
+    catalog = load_event_catalog(catalog_path) if catalog_path is not None else None
     investigator: InvestigationModel | None = None
 
     if investigate:
@@ -148,27 +152,28 @@ def build_analyze_alert(
             build_authentication_search_tool,
         )
 
-        searcher = build_authentication_search(
-            password_supplier=password_supplier,
-        )
+        from cybertriage.adapters.tools.related_events import build_related_event_search_tool
+        from cybertriage.adapters.wazuh.authentication_search import WazuhAuthenticationEventSearcher
+        from cybertriage.adapters.wazuh.related_event_search import WazuhRelatedEventSearcher
+        from cybertriage.domain.related_events import InvestigationScope
+
+        client = _build_indexer_client(password_supplier=password_supplier)
+        searcher = WazuhAuthenticationEventSearcher(client)
+        related_searcher = WazuhRelatedEventSearcher(client)
         authentication_grounder = build_authentication_grounder()
 
         def tools_for_scope(scope: AuthenticationScope | None):
-            return [build_authentication_search_tool(
-                searcher, grounder=authentication_grounder, scope=scope,
-            )]
+            return [
+                build_authentication_search_tool(searcher, grounder=authentication_grounder, scope=scope),
+                build_related_event_search_tool(related_searcher, catalog=catalog,
+                    scope=scope.related_events if isinstance(scope, InvestigationScope) else None),
+            ]
 
         investigator = OllamaInvestigationModel(
             model=ollama,
             tools=tools_for_scope(None),
             scoped_tool_factory=tools_for_scope,
         )
-
-    catalog = (
-        load_event_catalog(catalog_path)
-        if catalog_path is not None
-        else None
-    )
 
     return AnalyzeAlert(
         retriever=retriever,
@@ -400,12 +405,25 @@ def build_authentication_search(
     configuration: IndexerConfigurationProvider | None = None,
     password_supplier: Callable[[], str] | None = None,
 ) -> AuthenticationEventSearcher:
-    from cybertriage.adapters.configuration.indexer_environment import (
-        EnvironmentIndexerConfiguration,
-    )
     from cybertriage.adapters.wazuh.authentication_search import (
         WazuhAuthenticationEventSearcher,
     )
+    return WazuhAuthenticationEventSearcher(_build_indexer_client(configuration, password_supplier))
+
+
+def build_related_event_search(
+    configuration: IndexerConfigurationProvider | None = None,
+    password_supplier: Callable[[], str] | None = None,
+) -> RelatedEventSearcher:
+    from cybertriage.adapters.wazuh.related_event_search import WazuhRelatedEventSearcher
+    return WazuhRelatedEventSearcher(_build_indexer_client(configuration, password_supplier))
+
+
+def _build_indexer_client(
+    configuration: IndexerConfigurationProvider | None = None,
+    password_supplier: Callable[[], str] | None = None,
+) -> "WazuhIndexerHttpClient":
+    from cybertriage.adapters.configuration.indexer_environment import EnvironmentIndexerConfiguration
     from cybertriage.adapters.wazuh.indexer_http import (
         WazuhIndexerHttpClient,
     )
@@ -425,13 +443,11 @@ def build_authentication_search(
     if not isinstance(password, str) or not 1 <= len(password) <= 1024:
         raise ValueError("A valid Indexer password is required.")
 
-    return WazuhAuthenticationEventSearcher(
-        client=WazuhIndexerHttpClient(
-            base_url=settings.base_url,
-            username=settings.username,
-            password=password,
-            ca_bundle=settings.ca_bundle,
-        )
+    return WazuhIndexerHttpClient(
+        base_url=settings.base_url,
+        username=settings.username,
+        password=password,
+        ca_bundle=settings.ca_bundle,
     )
 
 

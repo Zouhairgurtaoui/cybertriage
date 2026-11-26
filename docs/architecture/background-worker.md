@@ -45,7 +45,7 @@ hidden password prompt. No additional model is downloaded by this mode.
 ## Application-generated task
 
 `ReadOnlyStoredInvestigationPlanner` implements the planner port. The stored-alert
-use case asks it for a task and authentication scope before invoking analysis.
+use case asks it for a task and combined account/host authority before invoking analysis.
 Raw log text, descriptions, and model prose never become task instructions.
 
 For Windows Security 4624/4625 the planner selects the explicit target account
@@ -57,13 +57,22 @@ unstructured usernames are not guessed.
 The permitted window spans observed member timestamps with five minutes of
 padding on each side. It is not the grouping bucket duration. A group snapshot
 includes every retained member when computing the span. Scope duration is capped
-at 24 hours and each lookup at 10 results. The initial objective requests 5 results.
+at 24 hours and each lookup at 10 results. Authentication-first objectives request
+5 results; related-event objectives request 3.
 The lookup uses indexed Wazuh alert timestamps and may return other hosts for the
 same identity; results do not independently establish a common actor.
 
 Missing or unsupported structured identities produce an empty account scope.
 The report states missing context; an attempted authentication search is rejected
-before reaching the Indexer.
+before reaching the Indexer. Explicit manager/agent metadata still permits
+bounded related-event host context without guessing an account identity.
+
+For account/group/process alerts, the planner requests the corresponding
+`search_related_events` profile first. Other alerts can request general host
+context, and authentication alerts retain their initial account lookup. The
+related tool requires the exact originating manager and agent; it cannot silently
+pivot across hosts. Mixed-host generated group snapshots are rejected. See
+[related-event authority](related-events.md).
 
 ## Per-job authority and provenance
 
@@ -80,6 +89,10 @@ lease heartbeat, stale-owner rejection, and atomic job/report completion remain.
 Report results retain investigation_task, investigation_scope_json, and each
 tool execution. Completion logs include the tool-call count. Empty scopes and
 model responses without tool calls remain visible in the saved provenance.
+
+Combined authority snapshots use version 2 and add `related_events`; their
+authentication account fields retain the existing contract. Previously saved
+version-1 snapshots remain readable without rewriting reports.
 
 The model cannot label feedback, suppress alerts, approve response actions, or
 execute commands through these tools. Reports remain provisional; scope checks

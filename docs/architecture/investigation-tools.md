@@ -1,7 +1,14 @@
 # Investigation tools
 
-The first tool searches Windows Security logon events:
+The authentication tool searches Windows Security logon events:
 4624 for successful logons and 4625 for failed logons.
+
+The registered `search_related_events` tool additionally searches bounded host
+context across account/group changes, process activity and general alerts. Its
+separate search port, exact host/time authority, field projection and coverage
+contract are documented in [related-event investigation](related-events.md).
+Both tools use the same verified read-only Indexer transport and report audit
+records. No model tool changes case findings or executes response actions.
 
 Requests identify an account and domain, an explicit time window
 of at most 24 hours, and a result limit of at most 100.
