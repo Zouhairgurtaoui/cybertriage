@@ -30,3 +30,14 @@ dist/
 
 # Deployment-specific access policies and firewall bindings
 /config/*.local.yaml
+
+# Independent React frontend
+node_modules/
+/apps/analyst-web/.env*
+!/apps/analyst-web/.env.example
+
+# Local container credentials and certificates
+/config/secrets/
+/config/certs/
+/config/*.local.env
+!/.env.docker.example

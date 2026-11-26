@@ -67,8 +67,9 @@ Authenticated Wazuh ingestion, SQLite-backed background analysis, and a read-onl
 authentication search are implemented. The analysis CLI supports opt-in model
 tool calling. Persisted proposals/approvals and an OPNsense firewall adapter are
 implemented behind explicit policy and analyst authorization checks.
-Background workers support opt-in scoped authentication investigation. The analyst
-web application remains planned. See
+Background workers support opt-in scoped authentication investigation. A separate
+React analyst application provides case, evidence, investigation, graph and
+response review screens through the authenticated analyst API. See
 [implementation status](docs/implementation-status.md).
 
 Ingestion includes auditable triage and candidate grouping before job scheduling.
@@ -76,6 +77,155 @@ Operator commands support analyst feedback and suppression-quality evaluation.
 Authentication results include computed search summaries and sourced code
 definitions. These features require deployment validation; model reports remain
 provisional.
+
+## Run the application with Docker Compose
+
+The root `compose.yaml` starts the React/Nginx frontend, analyst API, Wazuh
+ingestion API, automatic analysis worker, requested-investigation worker,
+response-expiry worker and Ollama. The optional `graph` profile additionally
+starts Neo4j, its schema initializer and the graph publication worker.
+Wazuh, the Indexer and Active Directory remain external lab systems.
+
+Use Docker Desktop with Linux containers and Docker Compose 2.24 or newer.
+Run the following from the repository root in Windows PowerShell. Initial
+configuration retains existing local files and asks for credentials without
+echoing them:
+
+```powershell
+.\scripts\cybertriage.ps1 configure
+```
+
+This creates ignored `.env.docker.local` and secret files under
+`config/secrets`. Enter the same ingestion token used by the Wazuh integration
+and the dedicated read-only Indexer password. A random local Neo4j password is
+generated once. The script does not replace existing credentials or configure
+the Wazuh VM. Keep the provisioned `config/analysts.local.yaml` from the analyst
+credential setup below; its token hashes and expiries are still required.
+
+Edit `.env.docker.local` to set the reachable Indexer HTTPS URL, read-only
+username and existing Ollama models directory. Copy the **public** Indexer CA
+to the path configured by `CYBERTRIAGE_INDEXER_CA_PATH`, for example:
+
+```powershell
+Copy-Item "C:\path\to\root-ca.pem" config/certs/indexer-ca.pem
+```
+
+Container paths differ from Windows paths. The workers receive the CA as
+`/run/indexer-ca.pem` and the model server is `http://ollama:11434`.
+`localhost` inside a container refers to that container. If the Indexer is
+reached through a Windows SSH tunnel, it must be reachable from Docker and its
+TLS identity must still match the configured URL. Merely substituting
+`host.docker.internal` for a certificate valid only for `127.0.0.1` will fail
+verification. For an existing loopback-certificate SSH forward on host port
+19200, configure:
+
+```dotenv
+CYBERTRIAGE_INDEXER_URL=https://127.0.0.1:19200
+CYBERTRIAGE_INDEXER_FORWARD_HOST=host.docker.internal
+CYBERTRIAGE_INDEXER_FORWARD_PORT=19200
+```
+
+Each worker opens a container-local TCP forward to the Windows SSH listener.
+It forwards encrypted bytes without terminating TLS; the original CA and
+certificate hostname checks remain enabled. Docker Desktop supplies the host
+DNS name. Keep the existing host SSH forward running. For a directly reachable
+certificate-matching Indexer endpoint, leave both forward variables empty.
+Worker startup checks TLS, authentication and search permission using a
+match-none query before claiming work; it retrieves no incident documents.
+
+The frontend build uses the existing `node:26-slim` image selection and the
+committed `apps/analyst-web/package-lock.json`. If the lockfile is absent, generate
+it with the Node container instructions before building. Container images and
+Python/Node dependencies may be downloaded during the initial build; **model
+weights are not downloaded**. Ollama mounts the existing model directory
+read-only and workers check that `qwen3:4b-instruct` and `nomic-embed-text` exist.
+
+Build the images:
+
+```powershell
+.\scripts\cybertriage.ps1 build
+```
+
+For an existing native installation, stop its APIs/workers before migration.
+Import its alert database, event catalogue and Chroma index **before the first
+container startup**:
+
+```powershell
+.\scripts\cybertriage.ps1 import-data
+```
+
+The import copies `data/alerts`, `data/catalogs` and `data/chroma` into a named
+Docker volume. Host files are read-only, existing container data is not
+overwritten, and SQLite files use backup snapshots. Unresolved response
+executions and outstanding/unresolved IP-block leases must be reconciled before
+migration. Keep the existing corpus/source configuration when importing it.
+
+For a fresh installation without an existing corpus, initialize the volume and
+populate knowledge before starting the backend writers. The configured models
+must already exist in the mounted model directory:
+
+```powershell
+docker compose --env-file .env.docker.local run --rm --no-deps bootstrap
+docker compose --env-file .env.docker.local up -d ollama
+docker compose --env-file .env.docker.local run --rm --no-deps worker catalog-update
+docker compose --env-file .env.docker.local run --rm --no-deps worker ingest --source mitre
+docker compose --env-file .env.docker.local run --rm --no-deps worker ingest --source microsoft
+```
+
+Catalogue/source ingestion needs public internet access; embedding uses the
+existing local model. For later knowledge updates, stop the backend containers
+first and repeat the maintenance commands with only Ollama running.
+
+Start all core services with one command:
+
+```powershell
+.\scripts\cybertriage.ps1 start
+```
+
+Open **http://127.0.0.1:5173** and enter a provisioned analyst token. The web
+container explicitly publishes `127.0.0.1:5173 → 8080`; Docker host networking
+and manually started Node shells are not required. The ingestion endpoint remains
+`http://127.0.0.1:8000/api/v1/alerts/wazuh`, preserving a host tunnel targeting
+port 8000. The analyst API and Ollama ports are not published to the host.
+
+To include Neo4j publication, select the graph profile:
+
+```powershell
+.\scripts\cybertriage.ps1 start -Graph
+```
+
+The new graph destination defaults to the `cybertriage-docker` namespace,
+separating its delivery cursors from a previously used Neo4j destination.
+Its password file initializes the local Neo4j account only on a fresh database;
+changing that file does not rotate an existing database's password.
+
+Routine operations:
+
+```powershell
+.\scripts\cybertriage.ps1 status
+.\scripts\cybertriage.ps1 logs
+.\scripts\cybertriage.ps1 stop
+```
+
+Stop retains named data/model-home/TLS/Neo4j volumes. Application-managed block
+expiry stops with its worker, so drain/reconcile live blocks before taking that
+service offline. Do not use `docker compose down -v` on retained evidence.
+
+Equivalent direct Compose commands are available when a PowerShell wrapper is
+not used:
+
+```powershell
+docker compose --env-file .env.docker.local up --build -d --wait --wait-timeout 300
+docker compose --env-file .env.docker.local ps --all
+docker compose --env-file .env.docker.local --profile graph down --timeout 210
+```
+
+The start command waits for declared health checks and reports dependency
+failures. Restart policies recover exited long-running containers; an unhealthy
+but still running process needs investigation. Health does not certify model
+accuracy, Indexer search completeness or traffic containment. Build, migration
+and end-to-end container acceptance remain pending. See
+[container architecture](docs/architecture/containers.md).
 
 ## Install the Python Application
 
@@ -478,7 +628,8 @@ Every case command supports `--alerts-database PATH`; the default is
 `data/alerts/alerts.sqlite3`. Read commands support bounded pagination; use
 `--help` for their options. Actor names are local audit metadata, not login
 credentials. The separate analyst API uses authenticated per-analyst credentials
-and case permissions. Browser login remains part of the future web application.
+and case permissions. The React application accepts those credentials in page
+memory; password login and identity-provider sessions are not implemented.
 Optional graph projection is described below.
 
 Offline validation, without the VMs or Ollama:
@@ -629,6 +780,80 @@ Invoke-RestMethod -Uri http://127.0.0.1:8001/api/v1/cases -Headers $headers
 Use the schema for case, graph, stage, response and investigation request bodies.
 The server rejects extra fields and derives the audit actor from authentication.
 Permission, expiry and case-version checks are independent of model output.
+
+#### React analyst application
+
+The frontend is an independent application in `apps/analyst-web`, with its own
+Node dependencies, build and container. FastAPI serves JSON only. During local
+development the browser contacts Vite on port 5173; Vite forwards `/api/v1`
+requests to the separately running analyst API on port 8001.
+
+Use Node.js 22.12 or newer with npm. In a second PowerShell terminal:
+
+```powershell
+Set-Location apps/analyst-web
+Copy-Item .env.example .env.local
+npm.cmd install
+npm.cmd run dev
+```
+
+Open `http://127.0.0.1:5173` and enter a provisioned analyst token. The ingestion
+token cannot grant analyst access. Keep the analyst API running in its own
+terminal. Investigation requests require the separate investigation worker;
+opening the frontend does not start backend workers or models.
+
+`apps/analyst-web/package-lock.json` records frontend dependencies. Review and
+commit changes to it; clean installations and Docker builds use `npm ci`.
+Dependencies and generated assets are excluded from Git. Full frontend
+build/browser acceptance is not yet recorded.
+
+Build the static bundle and optionally inspect it locally:
+
+```powershell
+npm.cmd run build
+npm.cmd run preview
+```
+
+Preview uses port 4173 and the same configured API proxy. It is a local preview
+server, not the production serving process. `ANALYST_API_UPSTREAM` in the app's
+ignored `.env.local` selects the development upstream. A remote upstream requires
+HTTPS with a trusted matching certificate; `NODE_EXTRA_CA_CERTS` can supply the
+private CA to Node. Never put credentials in `VITE_*` variables, which become
+browser-visible build settings.
+
+For a container deployment, generate the lockfile first and supply a reachable
+API origin. Example values below must match the deployment's DNS and certificate:
+
+```powershell
+Set-Location ../..
+$env:ANALYST_API_UPSTREAM = "https://analyst-api.example.internal:8001"
+$env:ANALYST_API_TLS_NAME = "analyst-api.example.internal"
+docker compose -f apps/analyst-web/compose.yaml up --build -d
+```
+
+The frontend container binds `127.0.0.1:8080` and proxies API requests using
+verified upstream TLS. A container's loopback does not reach the host API. For a
+host API, use a reachable host address and configure its TLS listener or a TLS
+reverse proxy; `host.docker.internal` is available to the container but still
+needs matching certificate/trust configuration. Keep browser traffic on local
+loopback or terminate HTTPS at the deployment ingress before exposing it remotely.
+
+For a private API CA, add an ignored `config/analyst-web.local.yaml` override
+with a read-only certificate mount (replace the host path):
+
+```yaml
+services:
+  analyst-web:
+    volumes:
+      - "C:/deployment/certs/root-ca.pem:/etc/cybertriage/api-ca.pem:ro"
+    environment:
+      ANALYST_API_CA_FILE: /etc/cybertriage/api-ca.pem
+```
+
+Include that override as a second `-f config/analyst-web.local.yaml` argument to
+the compose command. No firewall keys, Indexer passwords or model credentials
+belong in the frontend. See [frontend architecture](docs/architecture/analyst-web.md)
+for component boundaries, session handling and workflow limits.
 
 #### Additional investigations and related-alert candidates
 

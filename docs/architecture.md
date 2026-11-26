@@ -83,6 +83,13 @@ application JSON without asking the model to generate JSON.
 
 ## Incident cases
 
+The independent React application in `apps/analyst-web` provides the analyst
+console. It has a separate build, dev server and Nginx deployment image. A
+same-origin proxy connects browser requests to the existing analyst API; domain
+services, model execution, persistence and device credentials remain in Python.
+This separates frontend deployment without splitting the SQLite backend into
+distributed domain services. See [analyst frontend](architecture/analyst-web.md).
+
 `CaseManagement` depends on a persistence port and a pure observed-relationship
 policy. The SQLite adapter aggregates retained alerts and reports, appends notes
 and workflow history, and maintains separately classified observations and

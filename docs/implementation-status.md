@@ -61,6 +61,13 @@ Implemented code paths:
 - A separate analyst API with hashed expiring credentials, explicit operation/case
   permissions, authenticated audit actors, bounded request bodies and OpenAPI.
 - A separate leased queue and worker for explicit analyst-requested investigations.
+- Root Docker Compose lifecycle for frontend, APIs, workers and existing-model
+  Ollama; optional local Neo4j/schema/publication services, private API TLS,
+  file credentials, process health, retained named volumes and explicit import.
+- An independent React analyst application with evidence/case queues, timeline,
+  reports, investigation requests, relationship/Kill Chain review, graph browsing,
+  response approvals/dispatch and triage evaluation. Vite and Nginx provide
+  same-origin API proxies; frontend dependencies and deployment remain separate.
 
 ## What the YAML files actually control
 
@@ -88,11 +95,13 @@ Generation checks reject empty or unfinished output. Reports require review
 for factual accuracy and citation relevance. Optional JSON report files store
 application data; the model is not required to generate JSON.
 
-## Remaining backend work
+## Remaining work
 
 - Labelled evaluation of correlation candidates and any future causal/automatic
   case assignment; the implemented candidate query does not establish an attack chain.
-- Analyst web application, including authenticated graph visualization.
+- React dependency installation, locked build and browser/API acceptance,
+  including accessibility, graph interaction, authorization and mutation recovery.
+- Identity-provider/browser-session integration beyond in-memory API-token entry.
 - Live scoped-worker validation and additional investigation tools.
 - Labelled retrieval relevance evaluation, live source compatibility/workload
   validation, and additional source providers/discovery strategies.
@@ -101,6 +110,8 @@ application data; the model is not required to generate JSON.
 - OPNsense API/version, rule placement, traffic effects, expiry and failure-recovery
   acceptance. FortiGate/pfSense concrete adapters are not implemented.
 - Operational deployment acceptance, backup/restore and monitoring verification.
+- Container image builds, data import, Windows/VM connectivity, worker shutdown
+  and full-stack acceptance for the Compose layout.
 
 The core response and analyst backend paths are implemented, with execution
 disabled by default. This is not a claim of runtime or production acceptance.
@@ -110,8 +121,8 @@ See [response architecture](architecture/response-workflow.md),
 The triage policy ships with no active suppression rules. Unknown alerts remain
 eligible for analysis. Existing queue contents are not retroactively filtered.
 Operator CLI actor identifiers remain asserted metadata. Analyst HTTP operations
-use authenticated API principals; browser login/session integration remains part
-of the future web application.
+use authenticated API principals. The React application holds API credentials
+only in memory; password login and identity-provider sessions remain unimplemented.
 
 
 
@@ -174,4 +185,9 @@ investigation queue, candidate query and incremental graph delivery have receive
 syntax/import/CLI checks only. Their functional, concurrency, live-device and
 regression acceptance remains pending. The historical 29-check result does not
 cover these changes. Reinforcement-learning model training is not implemented.
+
+The React source and local module imports received static parsing checks.
+The frontend lockfile is present and consumed by Docker builds. No complete
+bundle/browser or container acceptance result is recorded yet. Static checks do
+not certify visual quality, runtime integration or deployment security.
 

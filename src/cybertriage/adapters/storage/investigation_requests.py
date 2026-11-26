@@ -77,6 +77,20 @@ class SqliteInvestigationRequests(SqliteAnalysisQueue):
         with self._cases._session() as connection:
             return self._view(connection, case_id, job_id)
 
+    def list_requests(self, case_id, limit=50, before=None):
+        from cybertriage.application.services.case_management import identifier, page
+        case_id = identifier(case_id)
+        page(limit)
+        if before is not None and (type(before) is not int or not 1 <= before <= 9223372036854775807):
+            raise CaseError("Request cursor must be a positive SQLite sequence.")
+        with self._cases._session() as connection:
+            self._cases._case(connection, case_id)
+            rows = connection.execute("""SELECT rowid AS sequence,job_id FROM requested_investigations
+                WHERE case_id=? AND (? IS NULL OR rowid<?) ORDER BY rowid DESC LIMIT ?""", (case_id, before, before, limit + 1)).fetchall()
+            return self._cases._bounded({"case_id": case_id,
+                "requests": [self._view(connection, case_id, row["job_id"]) for row in rows[:limit]],
+                "next_before": rows[limit - 1]["sequence"] if len(rows) > limit else None})
+
     def processing_context(self, job):
         with closing(self._connect()) as connection:
             connection.execute("BEGIN")

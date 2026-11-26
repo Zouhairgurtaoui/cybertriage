@@ -13,6 +13,7 @@ from cybertriage.application.ports.related_events import RelatedEventSearcher
 from cybertriage.application.ports.retrieval import ContextualKnowledgeRetriever
 
 from langchain_ollama import ChatOllama
+from cybertriage.adapters.configuration.ollama_environment import ollama_base_url
 
 from cybertriage.adapters.configuration.yaml_files import (
     YamlKnowledgeConfiguration,
@@ -143,7 +144,7 @@ def build_analyze_alert(
             "CYBERTRIAGE_MODEL",
             "qwen3:4b-instruct",
         ),
-        base_url="http://localhost:11434",
+        base_url=ollama_base_url(),
         temperature=0,
         num_ctx=8192,
         num_predict=800,

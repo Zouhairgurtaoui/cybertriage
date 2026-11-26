@@ -1,0 +1,17 @@
+.git
+.venv
+.env
+.env.*
+!.env.docker.example
+**/__pycache__
+**/*.pyc
+**/*.egg-info
+**/node_modules
+**/dist
+data
+config/*.local.*
+config/secrets
+config/certs
+apps
+result*.json
+.vscode

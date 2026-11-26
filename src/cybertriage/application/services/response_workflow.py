@@ -48,6 +48,16 @@ class ResponseWorkflow:
     def get(self, proposal_id: str):
         return self._repository.get(identifier(proposal_id))
 
+    def capabilities(self):
+        """Expose nonsecret constraints without granting response authority."""
+        return {"execution_enabled": self._snapshot.settings.execution_enabled,
+            "approval_ttl_seconds": self._snapshot.settings.approval_ttl_seconds,
+            "policy_revision": self._snapshot.revision,
+            "actions": [{"action": rule.action, "enabled": rule.enabled,
+                "targets": [target for target in rule.allowed_targets if (rule.action, target) in self._executors],
+                "required_parameters": list(rule.required_parameters), "max_duration_seconds": rule.max_duration_seconds}
+                for rule in self._snapshot.settings.rules]}
+
     def list(self, case_id: str, limit: int = 50, after: int = 0):
         page(limit, after)
         return self._repository.list(identifier(case_id), limit, after)

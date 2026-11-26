@@ -1,0 +1,17 @@
+services:
+  analyst-web:
+    build: .
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      ANALYST_API_UPSTREAM: "${ANALYST_API_UPSTREAM:?Set a reachable analyst API origin}"
+      ANALYST_API_TLS_NAME: "${ANALYST_API_TLS_NAME:-analyst-api}"
+      ANALYST_API_CA_FILE: "${ANALYST_API_CA_FILE:-/etc/ssl/certs/ca-certificates.crt}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped

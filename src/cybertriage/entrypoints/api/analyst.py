@@ -14,6 +14,8 @@ from starlette.concurrency import run_in_threadpool
 from cybertriage.adapters.configuration.analyst_keys import AnalystKeyStore
 from cybertriage.adapters.storage.investigation_requests import SqliteInvestigationRequests
 from cybertriage.adapters.storage.case_candidates import SqliteCaseCandidates
+from cybertriage.adapters.storage.analyst_read_sqlite import SqliteAnalystAlertReader
+from cybertriage.application.ports.analyst_read import AnalystAlertReader
 from cybertriage.bootstrap import build_case_graph_export, build_case_management, build_case_stages, build_response_runtime
 from cybertriage.domain.analyst import AnalystPrincipal
 from cybertriage.domain.case import CaseConflictError, CaseError, CaseStorageError
@@ -118,6 +120,7 @@ def create_analyst_app(database: Path, credentials: Path, response_config: Path,
     cases, stages = build_case_management(database), build_case_stages(database)
     requests = SqliteInvestigationRequests(database)
     candidate_reader = SqliteCaseCandidates(database)
+    alert_reader: AnalystAlertReader = SqliteAnalystAlertReader(database)
     build_response_runtime(database, response_config, firewalls_config)
     app = FastAPI(title="CyberTriage analyst API", debug=False, docs_url=None, redoc_url=None, openapi_url=None)
     bearer = HTTPBearer(auto_error=False)
@@ -170,7 +173,12 @@ def create_analyst_app(database: Path, credentials: Path, response_config: Path,
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Content-Security-Policy"] = "default-src 'none'; base-uri 'none'; frame-ancestors 'none'"
         return response
+
+    @app.get("/", include_in_schema=False)
+    async def service_info():
+        return {"service": "cybertriage-analyst-api", "health": "/healthz"}
 
     def register_error(error_type, code, detail=None):
         async def handle(request, error):
@@ -194,6 +202,16 @@ def create_analyst_app(database: Path, credentials: Path, response_config: Path,
     @app.get("/api/v1/me")
     async def me(identity=Depends(principal)):
         return {"analyst_id": identity.analyst_id, "permissions": sorted(identity.permissions), "case_ids": identity.case_ids}
+
+    @app.get("/api/v1/alerts")
+    async def alert_inbox(limit: int = 50, before: int | None = None, identity=Depends(permission("cases:read"))):
+        global_scope(identity)
+        return await run_in_threadpool(alert_reader.list_alerts, limit, before)
+
+    @app.get("/api/v1/alerts/{record_id}")
+    async def alert_detail(record_id: str, identity=Depends(permission("cases:read"))):
+        global_scope(identity)
+        return await run_in_threadpool(alert_reader.alert_detail, record_id)
 
     @app.get("/api/v1/cases")
     async def list_cases(limit: int = 50, after: str | None = None, status: str | None = None, identity=Depends(permission("cases:read"))):
@@ -320,6 +338,10 @@ def create_analyst_app(database: Path, credentials: Path, response_config: Path,
     async def investigation_status(case_id: str, job_id: str, identity=Depends(permission("cases:read"))):
         return await run_in_threadpool(requests.get_request, case_id, job_id)
 
+    @app.get("/api/v1/cases/{case_id}/investigation-requests")
+    async def investigation_requests(case_id: str, limit: int = 50, before: int | None = None, identity=Depends(permission("cases:read"))):
+        return await run_in_threadpool(requests.list_requests, case_id, limit, before)
+
     @app.post("/api/v1/cases/{case_id}/alerts/{alert_id}/feedback")
     async def feedback(case_id: str, alert_id: str, request: Request, identity=Depends(permission("triage:review"))):
         global_scope(identity)
@@ -341,6 +363,12 @@ def create_analyst_app(database: Path, credentials: Path, response_config: Path,
     async def list_responses(case_id: str, limit: int = 50, after: int = 0, identity=Depends(permission("cases:read"))):
         service = await run_in_threadpool(runtime)
         return await run_in_threadpool(service.list, case_id, limit, after)
+
+    @app.get("/api/v1/cases/{case_id}/response-capabilities")
+    async def response_capabilities(case_id: str, identity=Depends(permission("cases:read"))):
+        await run_in_threadpool(cases.get, case_id)
+        service = await run_in_threadpool(runtime)
+        return service.capabilities()
 
     @app.post("/api/v1/cases/{case_id}/responses", status_code=201)
     async def propose(case_id: str, request: Request, identity=Depends(permission("responses:propose"))):

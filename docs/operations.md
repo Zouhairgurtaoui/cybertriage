@@ -8,6 +8,13 @@ distributed deployment.
 
 ## Processes
 
+The root Docker Compose project supervises these process roles as separate
+containers. It supplies explicit loopback port publication, private API TLS,
+startup dependencies, bounded Docker logs and restart-on-exit policies. An
+optional profile manages Neo4j and graph publication. Wazuh/AD remain external.
+Container health is process/dependency status, not investigation correctness;
+see [container lifecycle and data](architecture/containers.md).
+
 Run each enabled process under an appropriate service supervisor with the same
 working directory and explicitly provisioned environment. The CLI reads ignored
 `.env.local`; a supervisor can provide those variables directly. Processes do
@@ -18,6 +25,7 @@ not install models, grant firewall privileges or enable execution themselves.
 | `serve` | Existing authenticated Wazuh ingestion listener, loopback by default. |
 | `worker --investigate` | Automatic queued analyses and bounded read-only investigation. |
 | `serve-analyst` | Separately authenticated case, graph, investigation and response API. |
+| `analyst-web` | Separate React frontend, served by Vite for local development or Nginx in deployment; proxies API requests. |
 | `investigation-worker` | Explicit analyst-requested investigations. |
 | `response-expiry-worker` | Due IP-block removals; keep running while leases exist. |
 | `graph-worker` | Optional changed-case publication to Neo4j. |
@@ -38,6 +46,15 @@ ACLs may cover more than one alias; the adapter's fixed-alias restriction is an
 application boundary, not a claim of appliance-level per-alias authorization.
 
 ## Connectivity and credentials
+
+Frontend and analyst API are independently deployed processes. The frontend
+does not read SQLite, Indexer credentials or firewall keys. Its same-origin
+proxy forwards the analyst bearer credential to the API, which enforces case
+scope and operation permissions. Restrict the upstream address at deployment;
+use verified TLS for API hops across untrusted networks. A private CA must be
+mounted read-only and the expected API TLS name must match its certificate.
+The frontend health endpoint checks Nginx liveness, not API/worker readiness.
+Local startup, package locking and deployment configuration are in the README.
 
 Expose the analyst API through TLS and restrict ingress to intended analyst
 clients. The ingestion and analyst credentials are independent. Do not put tokens
@@ -88,6 +105,12 @@ liveness only. Successful HTTP responses, worker completion and alias membership
 do not certify detection quality, compromise attribution or actual containment.
 
 ## Release acceptance
+
+Frontend acceptance additionally covers the locked dependency build, responsive
+layout, keyboard/dialog/graph accessibility, scoped-credential visibility,
+inactivity locking, stale-version conflicts, interrupted mutations and upstream
+TLS failures. The production CSP must remain compatible with the built assets
+without allowing inline scripts or arbitrary model-generated HTML.
 
 Acceptance includes isolated storage/HTTP/concurrency regression, scoped tool and
 live source behavior, a real Wazuh/AD event through retained reports/cases,

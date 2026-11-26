@@ -4,6 +4,8 @@ The analyst API is a separate FastAPI application and listener from Wazuh
 ingestion. It accepts per-analyst bearer credentials with explicit permissions,
 case scope and expiry. The ingestion token grants no analyst capability.
 Installation, credential generation and startup commands are in the README.
+The React application is built and served separately. This listener serves JSON
+and does not mount frontend assets; its root identifies the API service.
 
 ## Authentication and authorization
 
@@ -17,10 +19,10 @@ revocation does not automatically cancel them.
 The server supplies the analyst ID to audit services. Request models reject
 extra fields, including client-supplied actor or approval-authority overrides.
 These are API credentials, not browser login sessions or an OIDC implementation.
-The future web application must protect tokens and can replace the credential
-adapter with a session/identity-provider integration without changing case and
-response services. No cookies, cross-origin credentials or wildcard CORS are
-enabled.
+The separate React application keeps tokens in page memory and uses a same-origin
+API proxy. A future identity-provider/session adapter can replace token entry
+without changing case and response services. No cookies, cross-origin credentials
+or wildcard CORS are enabled. See [frontend boundaries](analyst-web.md).
 
 Permissions are independent:
 
@@ -55,6 +57,7 @@ requires a dedicated entitlement model; case membership alone does not provide i
 | Route family | Behavior |
 | --- | --- |
 | `/api/v1/me`, `/api/v1/schema` | Current permissions and authenticated OpenAPI contract. |
+| `/api/v1/alerts`, `/api/v1/alerts/{record_id}` | Bounded retained-alert inbox and evidence detail; global evidence scope required. |
 | `/api/v1/cases` | Scoped listing and explicit case creation. |
 | `/api/v1/cases/{case_id}` | Case metadata and versioned review updates. |
 | `.../alerts`, `.../notes`, `.../relationships`, `.../stages` | Existing application services with server-derived audit actors. |
@@ -63,6 +66,7 @@ requires a dedicated entitlement model; case membership alone does not provide i
 | `.../reports/{analysis_id}` | Complete saved report and input-alert coverage. |
 | `.../investigation-requests` | Durable requested investigations and status/report IDs. |
 | `.../responses` | Proposal creation, listing, detail, reviews, explicit execute and reconciliation. |
+| `.../response-capabilities` | Nonsecret configured actions and executor targets; grants no approval or execution authority. |
 | `.../alerts/{alert_id}/feedback`, `/api/v1/triage/evaluation` | Existing append-only analyst labels and suppression-quality evaluation; active case membership is checked before feedback. |
 
 Use the authenticated schema for exact field names and request contracts.
@@ -110,5 +114,6 @@ They do not prove a common person, lateral movement, causal ordering or compromi
 
 The API, request queue and response workflow have been implemented with static
 syntax/import checks. Live HTTP authorization, queue regression, model behavior,
-firewall execution and deployment acceptance remain to be validated. The API
-does not imply that the future analyst web interface has been implemented.
+firewall execution and deployment acceptance remain to be validated. The separate
+React interface has been implemented; its dependency installation, build and
+browser/API acceptance remain pending.

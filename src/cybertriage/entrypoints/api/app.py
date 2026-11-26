@@ -135,6 +135,10 @@ def create_app(
         debug=False,
     )
 
+    @app.get("/healthz", include_in_schema=False)
+    async def health():
+        return {"status": "up", "service": "cybertriage-ingestion"}
+
     @app.post(
         "/api/v1/alerts/wazuh",
         dependencies=[Depends(require_token)],
