@@ -2,7 +2,10 @@
 
 import os
 from pathlib import Path
-from typing import Callable
+from typing import Callable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from cybertriage.application.services.case_management import CaseManagement
 
 from langchain_ollama import ChatOllama
 
@@ -442,3 +445,13 @@ def build_triage_evaluation(database_path: Path):
     from cybertriage.adapters.storage.triage_sqlite import SqliteTriageReviewRepository
     from cybertriage.application.services.triage_review import EvaluateTriage
     return EvaluateTriage(SqliteTriageReviewRepository(database_path))
+
+
+def build_case_management(database_path: Path) -> "CaseManagement":
+    """Compose the local case service without loading models or network clients."""
+    from cybertriage.adapters.storage.cases_sqlite import SqliteCaseRepository
+    from cybertriage.application.policies.case_relationships import ObservedRelationshipPolicy
+    from cybertriage.application.services.case_management import CaseManagement
+
+    return CaseManagement(SqliteCaseRepository(database_path), ObservedRelationshipPolicy())
+

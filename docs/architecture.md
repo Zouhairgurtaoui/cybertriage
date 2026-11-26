@@ -66,6 +66,17 @@ metadata are kept distinct. Retrieved references provide background knowledge,
 not additional incident facts. The report and source metadata can be saved as
 application JSON without asking the model to generate JSON.
 
+## Incident cases
+
+`CaseManagement` depends on a persistence port and a pure observed-relationship
+policy. The SQLite adapter aggregates retained alerts and reports, appends notes
+and workflow history, and maintains separately classified observations and
+hypotheses. Case attachments are an explicit investigation scope, not an attack
+finding. Case findings are operator assertions; model text cannot update them.
+Report coverage and case linking commit with report/job completion. See
+[incident cases](architecture/cases.md) for lifecycle, provenance, pagination
+and trust boundaries. Neo4j remains a future projection of stored evidence.
+
 ## Response boundary
 
 Current code includes policy evaluation, not an execution backend. Policy
@@ -77,9 +88,11 @@ protected networks, including IPv4-mapped address forms.
 
 The future authenticated case-review workflow must obtain disposition and
 approval from trusted stored records, not model prose or arbitrary client flags.
-The CLI disposition flag is only a what-if preview. It creates no review record.
-Firewall executors, persisted approvals, authentication and auditing remain to
-be implemented. The model has no shell or firewall execution capability.
+The `response-policy` CLI disposition flag is only a what-if preview; it creates
+no review record. The separate `case-update` command persists an explicit local
+operator finding with case history. Firewall executors, persisted response
+approvals and authenticated analyst sessions remain to be implemented. The
+model has no shell or firewall execution capability.
 
 ## Analysis validation
 

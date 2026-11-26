@@ -271,7 +271,12 @@ def _run() -> None:
     triage_policy = commands.add_parser("triage-policy", help="Validate triage configuration and show its revision.")
     triage_policy.add_argument("--config", type=Path, default=Path("config/triage.yaml"))
 
+    from cybertriage.entrypoints.cases import register_case_commands, dispatch_case_command
+    register_case_commands(commands)
     args = parser.parse_args()
+
+    if dispatch_case_command(args):
+        return
 
     if args.command == "triage-policy":
         import json

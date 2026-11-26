@@ -5,6 +5,7 @@ from dataclasses import asdict
 from datetime import timezone
 from pathlib import Path
 from cybertriage.adapters.storage.analysis_records import insert_analysis
+from cybertriage.adapters.storage.case_records import initialize_case_schema
 
 from cybertriage.domain.triage import (
     AnalysisRecord,
@@ -25,6 +26,7 @@ class SqliteAnalysisWriter:
         try:
             with closing(self._connect()) as connection:
                 with connection:
+                    connection.execute("BEGIN IMMEDIATE")
                     connection.execute("""
                         CREATE TABLE IF NOT EXISTS analyses (
                             analysis_id TEXT PRIMARY KEY,
@@ -39,6 +41,7 @@ class SqliteAnalysisWriter:
                                 ON DELETE RESTRICT
                         )
                     """)
+                    initialize_case_schema(connection)
 
         except sqlite3.Error as error:
             raise AnalysisStorageError(

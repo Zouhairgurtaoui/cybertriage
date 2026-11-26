@@ -27,6 +27,12 @@ Implemented code paths:
 - Revisioned pre-analysis triage with retained suppressed alerts and audit history.
 - Bounded candidate groups that share pending jobs and supply full member summaries.
 - Append-only analyst labels, explicit release, and per-policy suppression metrics.
+- Persistent operator-managed cases with alert/group-snapshot attachments,
+  soft detachment, notes, timelines, explicit disposition and versioned updates.
+- Evidence-checked observed relationships, separately retained hypotheses and
+  append-only reviews; accepting a hypothesis does not change its kind.
+- Automatic transactional report linking with exact input-alert coverage and
+  bounded legacy report backfill on attachment.
 
 ## What the YAML files actually control
 
@@ -53,7 +59,7 @@ application data; the model is not required to generate JSON.
 
 ## Remaining backend work
 
-- Cross-technique incident/case correlation and Neo4j projection.
+- Automatic cross-technique case correlation and Neo4j/Cyber Kill Chain projection.
 - Live scoped-worker validation and additional investigation tools.
 - Real-model grounding/report-quality evaluation and operational workload validation.
 - Authenticated analyst review, stored approvals and audit records.
@@ -62,6 +68,8 @@ application data; the model is not required to generate JSON.
 - Deployment configuration and documentation.
 
 The policy foundation does not imply the approval/execution workflow is complete.
+Local case findings are stored, but authenticated approvals and executors are
+not yet connected. See [case architecture](architecture/cases.md).
 
 The triage policy ships with no active suppression rules. Unknown alerts remain
 eligible for analysis. Existing queue contents are not retroactively filtered.
@@ -87,4 +95,11 @@ accuracy and deployment validation.
 The report recorder stores generated outputs under ignored `data/evaluations/`.
 Execution completion and semantic review are tracked separately. Review criteria
 and recorder usage are documented in [analysis evaluation](evaluation.md).
+
+The case validation harness (`scripts/validate_cases.py`) covers persistent
+lifecycle, concurrency, relationship provenance, exact report coverage,
+transaction rollback, pagination and history constraints with isolated fixtures.
+It has been added but has not yet been executed. The scoped worker extension
+to the boundary suite also remains pending execution; the recorded 29-check
+result does not include either extension.
 

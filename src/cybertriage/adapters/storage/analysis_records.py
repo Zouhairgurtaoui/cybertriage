@@ -4,6 +4,7 @@ from dataclasses import asdict
 from datetime import timezone
 
 from cybertriage.domain.triage import AnalysisRecord
+from cybertriage.adapters.storage.case_records import record_analysis_case_links
 
 
 def insert_analysis(
@@ -43,3 +44,4 @@ def insert_analysis(
             result_json,
         ),
     )
+    record_analysis_case_links(connection, record)

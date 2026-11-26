@@ -49,6 +49,9 @@ and investigation tools.
 
 The CLI supports MITRE/Microsoft knowledge retrieval, local Windows Security
 event definitions, and analysis using `qwen3:4b-instruct` through Ollama.
+Persistent incident cases organize stored alerts, timeline entries, investigation
+notes, report history, and observed versus hypothetical relationships. Case
+commands use SQLite and do not require a running model or lab VM.
 The model returns a readable five-section report. Generation checks reject empty,
 non-text, or unfinished responses; there is no required model JSON schema,
 account-name masking, or automatic repair loop. Reports are provisional and
@@ -312,6 +315,65 @@ reviewed scheduling decisions rather than comprehensive attack detection accurac
 
 See [triage architecture](docs/architecture/triage.md) and the
 [validation guide](docs/validation/triage.md).
+
+### Incident cases
+
+Create a case and attach existing alert **record IDs** from the local database.
+These are CyberTriage record IDs, not Wazuh source IDs. Replace the example IDs
+with retained alerts. The commands below use PowerShell:
+
+```powershell
+$alertA = "ALERT_RECORD_ID_A"
+$alertB = "ALERT_RECORD_ID_B"
+$incident = python -m cybertriage case-create --title "Account activity investigation" --actor analyst --priority high | ConvertFrom-Json
+python -m cybertriage case-attach --case-id $incident.case_id --alert-id $alertA --alert-id $alertB --actor analyst --reason "Review these alerts together."
+python -m cybertriage case-note --case-id $incident.case_id --actor analyst --text "Requested account owner confirmation through a trusted channel."
+python -m cybertriage case-timeline --case-id $incident.case_id
+python -m cybertriage case-investigations --case-id $incident.case_id
+```
+
+An existing triage group can be attached with `--group-id GROUP_ID` instead of
+`--alert-id`. This takes a snapshot; later group members are not added silently.
+Reports covering attached input alerts are linked automatically when saved,
+and matching historic reports are linked during attachment.
+
+Use an observed relationship only when its structured evidence check passes:
+
+```powershell
+python -m cybertriage case-relate --case-id $incident.case_id --source-alert-id $alertA --target-alert-id $alertB --kind observed --predicate shares_host --actor analyst --reason "Both alerts report the same manager and agent."
+$hypothesis = python -m cybertriage case-relate --case-id $incident.case_id --source-alert-id $alertA --target-alert-id $alertB --kind hypothesis --predicate possible_related_activity --supporting-alert-id $alertA --supporting-alert-id $alertB --actor analyst --reason "Possible connection requiring additional session evidence." | ConvertFrom-Json
+$current = python -m cybertriage case-show --case-id $incident.case_id | ConvertFrom-Json
+python -m cybertriage case-review-relationship --case-id $incident.case_id --relationship-id $hypothesis.relationship_id --expected-version $current.version --decision accepted --actor reviewer --reason "Retain as a working hypothesis."
+```
+
+Accepting a hypothesis does not convert it into an observation or confirm
+compromise. `case-update` records explicit case status/disposition changes;
+confirmation requires supporting attached alerts and a reason. It never
+authorizes a firewall action. Metadata updates, detachments and relationship
+reviews require the latest `--expected-version`.
+
+| Command | Purpose |
+| --- | --- |
+| `case-list`, `case-show`, `case-update` | Case metadata, lifecycle and explicit findings. |
+| `case-attach`, `case-detach`, `case-alerts` | Retained evidence and membership history. |
+| `case-note`, `case-history` | Append-only investigation notes and workflow audit. |
+| `case-relate`, `case-review-relationship`, `case-relationships` | Evidence-checked observations and separately reviewed hypotheses. |
+| `case-timeline` | Chronological evidence, reports and workflow events. |
+| `case-investigations`, `case-report` | Saved reports, tool history and exact input alert coverage. |
+
+Every case command supports `--alerts-database PATH`; the default is
+`data/alerts/alerts.sqlite3`. Read commands support bounded pagination; use
+`--help` for their options. Actor names are local audit metadata, not login
+credentials. Case HTTP access, authenticated analyst sessions and Neo4j graph
+projection remain separate work.
+
+Offline validation, without the VMs or Ollama:
+
+```powershell
+python scripts/validate_cases.py
+```
+
+See [case architecture and evidence rules](docs/architecture/cases.md).
 
 ### Project documentation
 
