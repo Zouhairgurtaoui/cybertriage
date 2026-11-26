@@ -47,6 +47,10 @@ Implemented code paths:
   append-only reviews; accepting a hypothesis does not change its kind.
 - Automatic transactional report linking with exact input-alert coverage and
   bounded legacy report backfill on attachment.
+- Deterministic case graph JSON export and optional version-checked, transactional
+  Neo4j publication with namespace/case isolation and explicit schema setup.
+- Evidence-backed operator Kill Chain assessments, append-only reviews and
+  unassessed stages; hypotheses and reported chronology retain their meanings.
 
 ## What the YAML files actually control
 
@@ -73,7 +77,8 @@ application data; the model is not required to generate JSON.
 
 ## Remaining backend work
 
-- Automatic cross-technique case correlation and Neo4j/Cyber Kill Chain projection.
+- Automatic cross-technique case correlation, graph synchronization/outbox and
+  authenticated analyst graph visualization.
 - Live scoped-worker validation and additional investigation tools.
 - Labelled retrieval relevance evaluation, live source compatibility/workload
   validation, and additional source providers/discovery strategies.
@@ -135,6 +140,16 @@ platform metadata; finish ingestion and restart analysis before using that corpu
 `scripts/validate_live_web.py` adds 22 offline check groups for public route and
 privacy boundaries, DNS/TLS/HTTP handling, article parsing, cache freshness and
 leases, backoff, quotas/rollback, reference selection and configuration. They
-have not yet been executed. Live vendor compatibility and retrieval/model-quality
-gains remain unmeasured; the code is not an operational validation result.
+have been provided for offline validation; a complete execution result is not
+recorded here. A live lookup retrieved Microsoft event 4725 and MITRE T1098.007
+with one HTTP attempt each; repeating those lookups used fresh cache entries
+with zero HTTP attempts. This validates those routes and cache reuse only.
+Broader vendor compatibility, live worker integration and retrieval/model-quality
+gains still require measurement.
+
+`scripts/validate_case_graph.py` adds 12 isolated graph check groups using SQLite
+fixtures and a scripted Neo4j substitute. They have not been executed. Real
+Neo4j schema/query compatibility, concurrency and publication remain unvalidated;
+the offline substitute does not parse Cypher. End-to-end live investigation and
+case validation remain pending.
 

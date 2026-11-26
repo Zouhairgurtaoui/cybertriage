@@ -476,8 +476,8 @@ reviews require the latest `--expected-version`.
 Every case command supports `--alerts-database PATH`; the default is
 `data/alerts/alerts.sqlite3`. Read commands support bounded pagination; use
 `--help` for their options. Actor names are local audit metadata, not login
-credentials. Case HTTP access, authenticated analyst sessions and Neo4j graph
-projection remain separate work.
+credentials. Case HTTP access and authenticated analyst sessions remain separate
+work. Optional graph projection is described below.
 
 Offline validation, without the VMs or Ollama:
 
@@ -486,6 +486,73 @@ python scripts/validate_cases.py
 ```
 
 See [case architecture and evidence rules](docs/architecture/cases.md).
+
+### Case graphs
+
+Export a retained case graph without Neo4j, Ollama or the VMs. Choose a new
+output filename; the command does not overwrite existing files:
+
+```powershell
+python -m cybertriage graph-export --case-id $incident.case_id --output data/case-graph.json
+```
+
+The graph includes source alerts, reported entities, reviewed relationships,
+chronology, report pointers and all seven Cyber Kill Chain stages. Unassessed
+stages remain unassessed. An explicit stage interpretation needs active
+supporting alert record IDs and the current case version:
+
+```powershell
+$current = python -m cybertriage case-show --case-id $incident.case_id | ConvertFrom-Json
+# Choose the stage and reason from actual evidence; this is only a working hypothesis.
+$assessment = python -m cybertriage case-stage-add --case-id $incident.case_id --stage actions_on_objectives --kind hypothesis --supporting-alert-id $alertA --expected-version $current.version --actor analyst --reason "Evidence may support this objective; further investigation required." | ConvertFrom-Json
+python -m cybertriage case-stages --case-id $incident.case_id
+```
+
+`case-stage-review` appends a review using `--assertion-id`, `--decision`,
+`--expected-version`, `--actor` and `--reason`. Acceptance preserves the assessment
+kind; it does not confirm compromise or authorize a response.
+
+To publish to an existing Neo4j server, install the optional official driver
+in the project environment:
+
+```powershell
+python -m pip install -e ".[graph]"
+```
+
+Add the connection values to ignored `.env.local` (replace placeholders):
+
+```dotenv
+CYBERTRIAGE_NEO4J_URI=bolt://127.0.0.1:7687
+CYBERTRIAGE_NEO4J_USERNAME=cybertriage_projection
+CYBERTRIAGE_NEO4J_PASSWORD="REPLACE_WITH_PASSWORD"
+CYBERTRIAGE_NEO4J_DATABASE=neo4j
+CYBERTRIAGE_GRAPH_NAMESPACE=cybertriage
+```
+
+Remote servers require verified TLS: `neo4j+s://HOST:7687` or `bolt+s://HOST:7687`.
+The password can be omitted for a hidden interactive prompt. Initialize the
+constraint with a suitably privileged account, then publish with the projection
+account. Sync only publishes the selected case; it does not run automatically:
+
+```powershell
+python -m cybertriage graph-schema
+python -m cybertriage graph-sync --case-id $incident.case_id
+python scripts/validate_case_graph.py
+```
+
+Neo4j Browser can show the projected case after setting its case ID parameter:
+
+```cypher
+:param caseId => 'CASE_ID'
+MATCH (a:CTGraphNode)-[r]->(b:CTGraphNode)
+WHERE a.case_id = $caseId AND a:CTCase AND a.namespace = 'cybertriage'
+RETURN a, r, b LIMIT 200;
+```
+
+For stage assessments, expand `CT_HAS_STAGE_ASSESSMENT` and `CT_ASSESSES_STAGE`.
+`CT_FRAMEWORK_NEXT` is reference order, while `CT_NEXT_REPORTED_TIME` is source
+chronology; neither establishes an attacker path. SQLite remains authoritative.
+See [graph semantics, limits and security](docs/architecture/graph.md).
 
 ### Project documentation
 

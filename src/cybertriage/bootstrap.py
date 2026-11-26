@@ -486,3 +486,28 @@ def build_case_management(database_path: Path) -> "CaseManagement":
 
     return CaseManagement(SqliteCaseRepository(database_path), ObservedRelationshipPolicy())
 
+
+def build_case_stages(database_path: Path):
+    from cybertriage.adapters.storage.case_stages_sqlite import SqliteCaseStageRepository
+    from cybertriage.application.services.case_stages import CaseStages
+
+    return CaseStages(SqliteCaseStageRepository(database_path))
+
+
+def build_case_graph_export(database_path: Path, namespace: str = "cybertriage"):
+    from cybertriage.adapters.storage.cases_sqlite import SqliteCaseRepository
+    from cybertriage.adapters.storage.case_graph_sqlite import SqliteCaseGraphReader
+    from cybertriage.application.services.case_graph import CaseGraphBuilder, ExportCaseGraph
+
+    # Additive local schema migration precedes the separate read-only snapshot connection.
+    SqliteCaseRepository(database_path)
+    reader = SqliteCaseGraphReader(database_path)
+    return ExportCaseGraph(reader, CaseGraphBuilder(), namespace)
+
+
+def build_case_graph_projection(database_path: Path, sink, namespace: str = "cybertriage"):
+    from cybertriage.adapters.storage.case_graph_sqlite import SqliteCaseGraphReader
+    from cybertriage.application.services.case_graph import ProjectCaseGraph
+
+    return ProjectCaseGraph(build_case_graph_export(database_path, namespace), SqliteCaseGraphReader(database_path), sink)
+

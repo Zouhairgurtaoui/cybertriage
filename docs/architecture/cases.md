@@ -127,9 +127,11 @@ operating-system permissions remain the access boundary.
 An analyst web API must add authentication and case/evidence authorization,
 including authorization for every alert covered by a requested report.
 Response approvals and firewall execution remain separate, unimplemented
-workflows. SQLite is the source of truth. Neo4j projection, automatic
-cross-technique correlation and Cyber Kill Chain visualization remain future
-work; a timeline or accepted hypothesis does not fill missing attack stages.
+workflows. SQLite is the source of truth. The optional [case graph projection](graph.md)
+exports retained evidence to JSON/Neo4j, with explicit evidence-backed Cyber Kill
+Chain assessments and append-only reviews. Automatic cross-technique correlation
+and the analyst web graph remain future work; a timeline or accepted hypothesis
+does not fill missing attack stages.
 
 ## Offline validation
 

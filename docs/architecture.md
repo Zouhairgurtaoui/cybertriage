@@ -90,7 +90,10 @@ hypotheses. Case attachments are an explicit investigation scope, not an attack
 finding. Case findings are operator assertions; model text cannot update them.
 Report coverage and case linking commit with report/job completion. See
 [incident cases](architecture/cases.md) for lifecycle, provenance, pagination
-and trust boundaries. Neo4j remains a future projection of stored evidence.
+and trust boundaries. A pure case graph builder projects consistent stored
+snapshots to JSON and an optional Neo4j sink through separate reader/writer ports.
+Versioned publication, explicit Kill Chain assessments and evidence semantics
+are described in [case graphs](architecture/graph.md). SQLite remains authoritative.
 
 ## Response boundary
 

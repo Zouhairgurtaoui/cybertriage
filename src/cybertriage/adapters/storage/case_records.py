@@ -64,10 +64,23 @@ def initialize_case_schema(connection: sqlite3.Connection) -> None:
             analysis_id TEXT NOT NULL REFERENCES analyses(analysis_id), linked_at TEXT NOT NULL,
             UNIQUE(case_id, analysis_id))""",
         "CREATE INDEX IF NOT EXISTS case_analysis_history ON case_analyses(case_id, seq)",
+        """CREATE TABLE IF NOT EXISTS case_stage_assertions (
+            seq INTEGER PRIMARY KEY AUTOINCREMENT, assertion_id TEXT NOT NULL UNIQUE,
+            case_id TEXT NOT NULL REFERENCES incident_cases(case_id), stage TEXT NOT NULL CHECK(stage IN
+                ('reconnaissance','weaponization','delivery','exploitation','installation','command_and_control','actions_on_objectives')),
+            kind TEXT NOT NULL CHECK(kind IN ('hypothesis','analyst_assessed')), supporting_ids_json TEXT NOT NULL,
+            actor TEXT NOT NULL, reason TEXT NOT NULL, recorded_at TEXT NOT NULL)""",
+        "CREATE INDEX IF NOT EXISTS case_stage_history ON case_stage_assertions(case_id, seq)",
+        """CREATE TABLE IF NOT EXISTS case_stage_reviews (
+            seq INTEGER PRIMARY KEY AUTOINCREMENT, assertion_id TEXT NOT NULL REFERENCES case_stage_assertions(assertion_id),
+            decision TEXT NOT NULL CHECK(decision IN ('accepted','rejected','retracted','superseded')),
+            actor TEXT NOT NULL, reason TEXT NOT NULL, recorded_at TEXT NOT NULL)""",
+        "CREATE INDEX IF NOT EXISTS case_stage_review_history ON case_stage_reviews(assertion_id, seq)",
     )
     for statement in statements:
         connection.execute(statement)
-    for table in ("case_events", "case_relationships", "case_relationship_reviews", "analysis_alert_coverage", "case_analyses"):
+    for table in ("case_events", "case_relationships", "case_relationship_reviews", "analysis_alert_coverage", "case_analyses",
+                  "case_stage_assertions", "case_stage_reviews"):
         for operation in ("UPDATE", "DELETE"):
             connection.execute(f"""CREATE TRIGGER IF NOT EXISTS {table}_no_{operation.lower()}
                 BEFORE {operation} ON {table} BEGIN
