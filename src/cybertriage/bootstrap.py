@@ -18,7 +18,7 @@ from cybertriage.adapters.configuration.yaml_files import (
 )
 from cybertriage.application.services.analysis_worker import AnalysisWorker
 from cybertriage.adapters.knowledge.chunking import RecursiveKnowledgeChunker
-from cybertriage.adapters.knowledge.retrieval import FederatedKnowledgeRetriever
+from cybertriage.application.services.knowledge_retrieval import HybridKnowledgeRetriever
 from cybertriage.adapters.knowledge.sources.microsoft import MicrosoftEventSource
 from cybertriage.adapters.knowledge.sources.mitre import MitreSource
 from cybertriage.adapters.models.embeddings import RunbookEmbeddings
@@ -88,6 +88,23 @@ def _source_bindings(
     }
 
 
+def build_knowledge_retriever(
+    database_directory: Path,
+    sources_config_path: Path = DEFAULT_SOURCES_CONFIG,
+    configuration: KnowledgeConfigurationProvider | None = None,
+) -> HybridKnowledgeRetriever:
+    settings = _load_knowledge(sources_config_path, configuration)
+    if not database_directory.is_dir():
+        raise FileNotFoundError(f"Knowledge database directory not found: {database_directory}")
+    collections = [name for enabled, name, _ in _source_bindings(settings).values() if enabled]
+    if not collections:
+        raise ValueError("Enable at least one knowledge source in sources.yaml.")
+    embeddings = RunbookEmbeddings()
+    return HybridKnowledgeRetriever(tuple(ChromaKnowledgeIndex(
+        directory=database_directory, embeddings=embeddings, collection_name=name, create_if_missing=False,
+    ) for name in collections))
+
+
 def build_analyze_alert(
     database_directory: Path,
     catalog_path: Path | None = None,
@@ -98,35 +115,7 @@ def build_analyze_alert(
     investigate: bool = False,
     password_supplier: Callable[[], str] | None = None,
 ) -> AnalyzeAlert:
-    settings = _load_knowledge(sources_config_path, configuration)
-
-    if not database_directory.is_dir():
-        raise FileNotFoundError(
-            f"Knowledge database directory not found: {database_directory}"
-        )
-
-    collections = [
-        name
-        for enabled, name, _ in _source_bindings(settings).values()
-        if enabled
-    ]
-
-    if not collections:
-        raise ValueError(
-            "Enable at least one knowledge source in sources.yaml."
-        )
-
-    embeddings = RunbookEmbeddings()
-
-    retriever = FederatedKnowledgeRetriever(tuple(
-        ChromaKnowledgeIndex(
-            directory=database_directory,
-            embeddings=embeddings,
-            collection_name=name,
-            create_if_missing=False,
-        )
-        for name in collections
-    ))
+    retriever = build_knowledge_retriever(database_directory, sources_config_path, configuration)
 
     ollama = ChatOllama(
         model=model_name or os.environ.get(
@@ -181,6 +170,7 @@ def build_analyze_alert(
         retrieval_limit=3,
         catalog=catalog,
         investigator=investigator,
+        contextual_retriever=retriever,
     )
 
 def build_knowledge_ingestion(

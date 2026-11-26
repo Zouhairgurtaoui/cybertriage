@@ -60,6 +60,9 @@ thinking disabled in the client configuration.
 
 Knowledge ingestion and retrieval read `config/sources.yaml`. Response eligibility
 reads `config/response_actions.yaml` through a separate application policy.
+Default analysis combines semantic and BM25 retrieval with exact identifiers,
+explicit platform compatibility and document diversity. Reports retain a
+retrieval trace explaining the selected background references.
 Authenticated Wazuh ingestion, SQLite-backed background analysis, and a read-only
 authentication search are implemented. The analysis CLI supports opt-in model
 tool calling. There is no firewall executor or approval-storage workflow yet.
@@ -211,6 +214,43 @@ the model download size and varies with context and execution settings.
 
 Sources: [Windows setup](https://docs.ollama.com/windows),
 [model details](https://ollama.com/library/qwen3:4b-instruct).
+
+## Knowledge retrieval
+
+Refresh source metadata for existing collections, then restart any analysis
+workers. Unchanged chunks keep their IDs, text and embeddings; only metadata
+is updated. Fetching sources requires internet access, and any new chunks use
+the existing `nomic-embed-text` embedding model:
+
+```powershell
+python -m cybertriage ingest --source mitre
+python -m cybertriage ingest --source microsoft
+```
+
+Finish ingestion before restarting analysis. Old collections without platform
+metadata remain usable, but incompatible-platform filtering requires the refresh.
+No additional model or Python dependency is required.
+
+Inspect references and ranking provenance without generating an LLM report:
+
+```powershell
+python -m cybertriage retrieve --query "An account failed to log on" --event-id 4625 --provider Microsoft-Windows-Security-Auditing --channel Security --k 3 --output data/evaluations/retrieval-4625.json
+```
+
+Ollama must serve the existing embedding model for semantic searches; Wazuh and
+the Indexer are not required. `--platform windows|linux|macos` supplies explicit
+host context when no event identity is available. `--database` and
+`--sources-config` select the configured collections. Retrieval scores are
+ranking heuristics, not confidence in an incident finding.
+
+Offline checks use in-memory substitutes and need neither Ollama nor Chroma data:
+
+```powershell
+python scripts/validate_retrieval.py
+```
+
+See [ranking, snapshots and provenance](docs/architecture/retrieval.md).
+Controlled live web retrieval remains a separate planned capability.
 
 ## Investigation search connection
 

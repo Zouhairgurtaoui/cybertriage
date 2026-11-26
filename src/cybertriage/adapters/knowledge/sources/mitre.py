@@ -92,6 +92,10 @@ class MitreSource:
                     f"Technique lacks its ATT&CK reference: {item.get('id')}"
                 )
 
+            platforms = item.get("x_mitre_platforms", [])
+            if not isinstance(platforms, list):
+                raise ValueError("ATT&CK platforms must be a list.")
+
             documents.append(
                 KnowledgeDocument(
                     document_id=f"mitre_attack:{item['id']}",
@@ -101,6 +105,7 @@ class MitreSource:
                     source_url=reference["url"],
                     source_revision=self.revision,
                     retrieved_at=retrieved_at,
+                    platforms=tuple(platforms),
                 )
             )
 

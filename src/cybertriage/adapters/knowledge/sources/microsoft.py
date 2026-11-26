@@ -95,4 +95,5 @@ class MicrosoftEventSource:
             source_url=url,
             source_revision=f"sha256:{snapshot_hash}",
             retrieved_at=datetime.now(timezone.utc),
+            platforms=("Windows",),
         )

@@ -10,7 +10,11 @@ Implemented code paths:
 
 - MITRE ingestion pinned by a revision in `config/sources.yaml`.
 - Configurable Microsoft documentation ingestion, chunking and Chroma storage.
-- Source-aware retrieval from the configured enabled collections.
+- Hybrid semantic/BM25 retrieval across enabled collections, exact identifier
+  prioritization, explicit platform filtering, document diversity and whole-chunk
+  citations with persisted query-local ranking provenance.
+- Metadata-only refresh for existing Chroma chunks, latest-fetched snapshot
+  selection and a retrieval inspection CLI without chat-model generation.
 - Local Windows Security catalogue with exact provider/channel/event-ID lookup.
 - Validated local catalogue snapshots and atomic replacement.
 - Five-section text analysis through a small model port.
@@ -66,7 +70,7 @@ application data; the model is not required to generate JSON.
 
 - Automatic cross-technique case correlation and Neo4j/Cyber Kill Chain projection.
 - Live scoped-worker validation and additional investigation tools.
-- Retrieval relevance improvements and controlled, cached live web retrieval.
+- Labelled retrieval relevance evaluation and controlled, cached live web retrieval.
 - Real-model grounding/report-quality evaluation and operational workload validation.
 - Authenticated analyst review, stored approvals and audit records.
 - Allowlisted response executors connected to the response policy.
@@ -114,4 +118,11 @@ and runtime authority, query construction, source mapping, role preservation,
 projection/truncation, tool errors and budgets, invocation isolation and persisted
 worker tool provenance. They have not yet been executed. Live Indexer mappings
 and model selection/interpretation of the new capability remain unvalidated.
+
+`scripts/validate_retrieval.py` adds 17 offline check groups for hybrid ranking,
+platform/identifier boundaries, corpus lifecycle, budgets, source errors,
+concurrent provenance, metadata upgrades and analysis compatibility. They have
+not yet been executed. Real-query relevance and model grounding gains have not
+yet been measured. Existing collections need source refresh to gain explicit
+platform metadata; finish ingestion and restart analysis before using that corpus.
 

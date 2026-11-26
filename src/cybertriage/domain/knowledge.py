@@ -12,6 +12,12 @@ class KnowledgeDocument:
     source_url: str
     source_revision: str
     retrieved_at: datetime
+    platforms: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if (not isinstance(self.platforms, tuple) or len(self.platforms) > 32
+                or any(not isinstance(item, str) or not item.strip() or len(item) > 64 for item in self.platforms)):
+            raise ValueError("Platforms must be a tuple of at most 32 bounded names.")
 
     @property
     def content_hash(self) -> str:

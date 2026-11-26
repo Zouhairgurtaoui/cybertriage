@@ -9,7 +9,7 @@ flowchart TD
     Configuration --> Bootstrap[Composition root]
     Input[Incident evidence] --> UseCase[AnalyzeAlert]
     Catalog[Local event catalogue] --> UseCase
-    Chroma[Enabled source collections] --> Retrieval[Composite retriever]
+    Chroma[Enabled source collections] --> Retrieval[Hybrid semantic and lexical retriever]
     Retrieval --> UseCase
     Bootstrap --> UseCase
     UseCase --> Model[Ollama readable report]
@@ -28,7 +28,9 @@ flowchart TD
   names to source factories and collections.
 - **Strategy:** model, retrieval, configuration and parameter-validation ports
   allow alternative implementations.
-- **Composite:** `FederatedKnowledgeRetriever` combines configured retrievers.
+- **Composite:** `HybridKnowledgeRetriever` combines configured candidate sources.
+- **Ranking policy:** BM25, rank fusion, exact identifiers, explicit platform
+  compatibility and document diversity select background references.
 - **Policy object:** `ResponseActionPolicy` evaluates a concrete action proposal.
 
 These patterns are used where there is an actual boundary. Empty architecture
@@ -54,6 +56,12 @@ lifetime. `PreviewResponseAction` calls the policy without supplying approval;
 it cannot approve or execute anything.
 
 ## Readable analysis baseline
+
+Analysis supplies typed event/platform context to the hybrid retrieval port and
+persists per-call selection provenance. Snapshot limits, metadata upgrades,
+ranking semantics and the inspection CLI are described in
+[knowledge retrieval](architecture/retrieval.md). Reference selection remains
+separate from incident findings and from factual certification of model text.
 
 `TriageModel.analyze()` returns ordinary text. There is no required model JSON
 schema, account-name substitution, generated-quote matching, or corrective loop.

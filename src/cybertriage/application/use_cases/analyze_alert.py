@@ -8,6 +8,8 @@ from cybertriage.domain.agent import ToolExecution, validate_investigation_task
 from cybertriage.domain.security_event import EventIdentity
 from cybertriage.domain.investigation import AuthenticationScope
 from cybertriage.domain.triage import RetrievedReference, TriageResult
+from cybertriage.application.ports.retrieval import ContextualKnowledgeRetriever
+from cybertriage.domain.retrieval import RetrievalContext
 
 
 class AnalyzeAlert:
@@ -19,6 +21,7 @@ class AnalyzeAlert:
         catalog: SecurityEventCatalog | None = None,
         *,
         investigator: InvestigationModel | None = None,
+        contextual_retriever: ContextualKnowledgeRetriever | None = None,
     ):
         if not 1 <= retrieval_limit <= 20:
             raise ValueError("retrieval_limit must be between 1 and 20.")
@@ -28,6 +31,7 @@ class AnalyzeAlert:
         self._retrieval_limit = retrieval_limit
         self._catalog = catalog
         self._investigator = investigator
+        self._contextual_retriever = contextual_retriever
 
     def execute(
         self,
@@ -103,12 +107,15 @@ class AnalyzeAlert:
                 )
             )
 
-        references.extend(
-            self._retriever.retrieve(
-                query=query,
-                k=self._retrieval_limit,
-            )
-        )
+        retrieval_trace = None
+        if self._contextual_retriever is None:
+            references.extend(self._retriever.retrieve(query=query, k=self._retrieval_limit))
+        else:
+            outcome = self._contextual_retriever.retrieve_for(query,
+                RetrievalContext(event=event, event_description=definition.description if definition else None),
+                k=self._retrieval_limit)
+            references.extend(outcome.references)
+            retrieval_trace = outcome.trace_json
 
         reference_tuple = tuple(references)
 
@@ -158,4 +165,5 @@ class AnalyzeAlert:
             investigation_scope_json=(
                 investigation_scope.snapshot_json() if investigation_scope is not None else None
             ),
+            retrieval_trace_json=retrieval_trace,
         )

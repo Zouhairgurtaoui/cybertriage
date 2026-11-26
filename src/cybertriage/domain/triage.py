@@ -22,6 +22,7 @@ class TriageResult:
     tool_executions: tuple[ToolExecution, ...] = ()
     investigation_task: str | None = None
     investigation_scope_json: str | None = None
+    retrieval_trace_json: str | None = None
 
 @dataclass(frozen=True)
 class AnalysisRecord:
