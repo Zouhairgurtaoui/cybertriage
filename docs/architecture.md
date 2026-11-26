@@ -10,7 +10,10 @@ flowchart TD
     Input[Incident evidence] --> UseCase[AnalyzeAlert]
     Catalog[Local event catalogue] --> UseCase
     Chroma[Enabled source collections] --> Retrieval[Hybrid semantic and lexical retriever]
-    Retrieval --> UseCase
+    Retrieval --> Web[Configured public-document augmentation]
+    Public[Approved vendor routes] --> Web
+    Cache[TTL public-document cache] <--> Web
+    Web --> UseCase
     Bootstrap --> UseCase
     UseCase --> Model[Ollama readable report]
     Model --> Completion[Nonempty text and completion checks]
@@ -29,6 +32,8 @@ flowchart TD
 - **Strategy:** model, retrieval, configuration and parameter-validation ports
   allow alternative implementations.
 - **Composite:** `HybridKnowledgeRetriever` combines configured candidate sources.
+- **Decorator:** `LiveWebKnowledgeRetriever` augments local retrieval through
+  separate fetch/parser/cache ports with explicit freshness provenance.
 - **Ranking policy:** BM25, rank fusion, exact identifiers, explicit platform
   compatibility and document diversity select background references.
 - **Policy object:** `ResponseActionPolicy` evaluates a concrete action proposal.
@@ -62,6 +67,8 @@ persists per-call selection provenance. Snapshot limits, metadata upgrades,
 ranking semantics and the inspection CLI are described in
 [knowledge retrieval](architecture/retrieval.md). Reference selection remains
 separate from incident findings and from factual certification of model text.
+Public source lookups, caching, network boundaries and offline overrides are
+described in [live knowledge retrieval](architecture/live-web.md).
 
 `TriageModel.analyze()` returns ordinary text. There is no required model JSON
 schema, account-name substitution, generated-quote matching, or corrective loop.

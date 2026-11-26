@@ -2,6 +2,7 @@ from langchain_ollama import ChatOllama
 
 from cybertriage.adapters.models.triage_prompt import TRIAGE_PROMPT
 from cybertriage.domain.triage import RetrievedReference
+from cybertriage.adapters.models.reference_formatting import format_reference
 
 
 class OllamaTriageModel:
@@ -39,7 +40,6 @@ class OllamaTriageModel:
         if not references:
             return "No reference material was retrieved. State this limitation; do not invent citations."
         return "\n\n".join(
-            f"[R{number}]\nTitle: {reference.title}\n"
-            f"Source: {reference.source_url}\nExcerpt:\n{reference.text}"
+            format_reference(reference, number)
             for number, reference in enumerate(references, start=1)
         )

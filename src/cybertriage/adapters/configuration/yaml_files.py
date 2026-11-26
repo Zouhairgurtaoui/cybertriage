@@ -3,6 +3,7 @@
 import re
 from ipaddress import ip_network
 from pathlib import Path
+from pathlib import PureWindowsPath
 from urllib.parse import urlsplit
 
 import yaml
@@ -12,6 +13,7 @@ from cybertriage.domain.configuration import (
     KnowledgePage, KnowledgeSettings, MicrosoftSettings, MitreSettings,
 )
 from cybertriage.domain.response import ResponseActionRule, ResponseSettings
+from cybertriage.domain.live_web import LiveWebSettings
 
 
 MAX_CONFIG_BYTES = 64 * 1024
@@ -108,7 +110,12 @@ class YamlKnowledgeConfiguration:
         self._path = path
 
     def load(self) -> KnowledgeSettings:
-        root = _fields(_read_yaml(self._path),
+        values = _read_yaml(self._path)
+        web_present = "live_web" in values
+        web_values = values.pop("live_web", None)
+        if web_present and web_values is None:
+            raise ValueError("live_web must be a mapping, not null.")
+        root = _fields(values,
                        {"schema_version", "chunking", "event_catalog_url", "sources"}, "sources config")
         _integer(root["schema_version"], "schema_version", 1, 1)
         chunking = _fields(root["chunking"], {"size", "overlap"}, "chunking")
@@ -142,7 +149,27 @@ class YamlKnowledgeConfiguration:
         if mitre_settings.collection_name == microsoft_settings.collection_name:
             raise ValueError("Knowledge sources must use distinct collections.")
         return KnowledgeSettings(mitre_settings, microsoft_settings,
-                                 _learn_url(root["event_catalog_url"]), size, overlap)
+                                 _learn_url(root["event_catalog_url"]), size, overlap, _live_web(web_values))
+
+
+def _live_web(value: object) -> LiveWebSettings:
+    if value is None:
+        return LiveWebSettings()
+    values = _fields(value, {"enabled", "sources", "cache_path", "ttl_seconds", "not_found_ttl_seconds",
+        "max_stale_seconds", "allow_stale_on_error", "max_targets", "max_http_requests"}, "live_web")
+    path_text = _text(values["cache_path"], "live cache path", 256)
+    path = Path(path_text)
+    if (path.is_absolute() or PureWindowsPath(path_text).drive or ".." in path.parts or ".." in PureWindowsPath(path_text).parts
+            or not path.parts or path.parts[0] != "data" or path.suffix != ".sqlite3" or "\\" in path_text):
+        raise ValueError("Live cache must use a relative data/.../*.sqlite3 path without traversal.")
+    sources = _identifiers(values["sources"], "live sources")
+    return LiveWebSettings(_boolean(values["enabled"], "live enabled"), sources, path,
+        _integer(values["ttl_seconds"], "web TTL", 300, 604800),
+        _integer(values["not_found_ttl_seconds"], "negative web TTL", 60, 3600),
+        _integer(values["max_stale_seconds"], "max stale interval", 0, 2592000),
+        _boolean(values["allow_stale_on_error"], "stale policy"),
+        _integer(values["max_targets"], "web target limit", 1, 3),
+        _integer(values["max_http_requests"], "HTTP request limit", 1, 9))
 
 
 class YamlResponseConfiguration:

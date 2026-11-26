@@ -1,5 +1,16 @@
 schema_version: 1
 
+live_web:
+  enabled: true
+  sources: [microsoft, mitre]
+  cache_path: data/cache/live-web.sqlite3
+  ttl_seconds: 86400
+  not_found_ttl_seconds: 900
+  max_stale_seconds: 604800
+  allow_stale_on_error: true
+  max_targets: 2
+  max_http_requests: 6
+
 chunking:
   size: 1200
   overlap: 150

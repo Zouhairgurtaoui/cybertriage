@@ -1,7 +1,8 @@
 """Typed configuration values, independent of YAML and concrete clients."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from cybertriage.domain.live_web import LiveWebSettings
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,7 @@ class KnowledgeSettings:
     catalog_url: str
     chunk_size: int
     chunk_overlap: int
+    live_web: LiveWebSettings = field(default_factory=LiveWebSettings)
 
 @dataclass(frozen=True)
 class IndexerSettings:

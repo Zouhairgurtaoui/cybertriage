@@ -11,6 +11,7 @@ class RetrievedReference:
     title: str
     source_url: str
     text: str
+    provenance_json: str | None = None
 
 
 

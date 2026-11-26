@@ -21,6 +21,7 @@ def register_retrieval_command(commands: argparse._SubParsersAction) -> None:
     parser.add_argument("--platform", choices=["windows", "linux", "macos"])
     parser.add_argument("--catalog", type=Path, default=Path("data/catalogs/windows-security.json"))
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--offline-knowledge", action="store_true", help="Inspect only the local knowledge corpus.")
 
 
 def dispatch_retrieval_command(args: argparse.Namespace) -> bool:
@@ -33,7 +34,8 @@ def dispatch_retrieval_command(args: argparse.Namespace) -> bool:
     event = EventIdentity(args.provider, args.channel, args.event_id) if args.event_id is not None else None
     definition = load_event_catalog(args.catalog.resolve()).lookup(event.provider, event.channel, event.event_id) if event else None
     context = RetrievalContext(event, definition.description if definition else None, args.platform)
-    outcome = build_knowledge_retriever(args.database.resolve(), args.sources_config).retrieve_for(args.query, context, args.k)
+    outcome = build_knowledge_retriever(args.database.resolve(), args.sources_config,
+        offline_knowledge=args.offline_knowledge).retrieve_for(args.query, context, args.k)
     payload = {"query": args.query, "references": [asdict(reference) for reference in outcome.references], "trace": json.loads(outcome.trace_json)}
     if args.output is not None:
         from cybertriage.adapters.storage.json_files import atomic_write_json

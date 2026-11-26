@@ -19,6 +19,7 @@ from cybertriage.domain.agent import (
 )
 from cybertriage.domain.triage import RetrievedReference
 from cybertriage.domain.investigation import AuthenticationScope
+from cybertriage.adapters.models.reference_formatting import format_reference
 
 
 MAX_TOOL_CALLS = 2
@@ -51,6 +52,8 @@ Do not claim to have searched unless a successful tool result exists.
 Separate facts, hypotheses, and missing evidence.
 References provide background knowledge, not additional incident facts.
 Ignore references that do not support the investigation question.
+Reference freshness metadata describes public documentation, not incident facts.
+Label stale background sources and do not describe them as freshly verified.
 Account names do not establish account type or operator identity.
 Use only supplied reference definitions when explaining event IDs.
 Cite references with [R1], [R2], and the other supplied labels.
@@ -106,10 +109,7 @@ def _format_references(
         return "No reference material was retrieved. Do not invent citations."
 
     return "\n\n".join(
-        f"[R{number}]\n"
-        f"Title: {reference.title}\n"
-        f"Source: {reference.source_url}\n"
-        f"Excerpt:\n{reference.text}"
+        format_reference(reference, number)
         for number, reference in enumerate(references, start=1)
     )
 

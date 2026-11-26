@@ -70,6 +70,7 @@ def _run() -> None:
     analyze.add_argument("--provider")
     analyze.add_argument("--channel")
     analyze.add_argument("--sources-config", type=Path, default=Path("config/sources.yaml"))
+    analyze.add_argument("--offline-knowledge", action="store_true", help="Use local knowledge only; disable public web document lookups.")
     analyze.add_argument(
         "--catalog",
         type=Path,
@@ -171,6 +172,7 @@ def _run() -> None:
     )
     stored.add_argument("--record-id", required=True)
     stored.add_argument("--investigate", action="store_true", help="Enable application-scoped read-only tool calls.")
+    stored.add_argument("--offline-knowledge", action="store_true")
     stored.add_argument("--query")
     stored.add_argument("--model")
     stored.add_argument("--output", type=Path)
@@ -221,6 +223,7 @@ def _run() -> None:
     )
     worker.add_argument("--model")
     worker.add_argument("--investigate", action="store_true", help="Enable application-scoped read-only tool calls for queued alerts.")
+    worker.add_argument("--offline-knowledge", action="store_true")
     worker.add_argument("--once", action="store_true")
     worker.add_argument(
         "--job-id",
@@ -478,6 +481,7 @@ def _run() -> None:
             model_name=args.model,
             sources_config_path=args.sources_config,
             investigate=args.investigate,
+            offline_knowledge=args.offline_knowledge,
             password_supplier=_read_indexer_password if args.investigate else None,
         )
 
@@ -547,6 +551,7 @@ def _run() -> None:
             retry_delay_seconds=args.retry_delay_seconds,
             poll_seconds=args.poll_seconds,
             investigate=args.investigate,
+            offline_knowledge=args.offline_knowledge,
             password_supplier=_read_indexer_password if args.investigate else None,
         )
 
@@ -680,6 +685,7 @@ def _run() -> None:
         model_name=args.model,
         sources_config_path=args.sources_config,
         investigate=args.investigate,
+        offline_knowledge=args.offline_knowledge,
         password_supplier=(
             read_investigation_password
             if args.investigate

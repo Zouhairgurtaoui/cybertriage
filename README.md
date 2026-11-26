@@ -250,7 +250,38 @@ python scripts/validate_retrieval.py
 ```
 
 See [ranking, snapshots and provenance](docs/architecture/retrieval.md).
-Controlled live web retrieval remains a separate planned capability.
+
+### Live public documentation
+
+`config/sources.yaml` now enables identifier-based live retrieval from Microsoft
+Learn and MITRE ATT&CK. Event identities and technique IDs select approved
+documentation routes; incident text is not submitted to an internet search API.
+Public snapshots are cached under `data/cache/live-web.sqlite3`, with TTL,
+conditional refresh, bounded stale fallback and source provenance in reports.
+
+```powershell
+python -m cybertriage retrieve --query "T1098.007 account group changes" --platform windows --output data/evaluations/live-knowledge.json
+python -m cybertriage retrieve --query "An account was disabled" --event-id 4725 --provider Microsoft-Windows-Security-Auditing --channel Security --output data/evaluations/live-event-4725.json
+```
+
+These commands require the configured local collections and embedding service.
+Cache misses/refreshes additionally require direct public HTTPS access. Source
+errors preserve local context with visible diagnostics; they do not demonstrate
+an absence of incident activity. Live references include fetch/validation times,
+content hashes and explicit stale labels.
+
+Use `--offline-knowledge` on `retrieve`, `analyze`, `analyze-stored` or `worker`
+to use the static local corpus without live/cache augmentation. Set
+`live_web.enabled: false` to disable it through configuration. Restart running
+workers after changes. No additional model, browser, dependency or search key
+is needed.
+
+```powershell
+python scripts/validate_live_web.py
+```
+
+The validation script uses isolated caches and fake HTTP/DNS; it needs neither
+internet access nor Ollama. See [live retrieval design and limits](docs/architecture/live-web.md).
 
 ## Investigation search connection
 

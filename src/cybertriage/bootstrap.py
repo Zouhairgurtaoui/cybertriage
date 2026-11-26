@@ -3,12 +3,14 @@
 import os
 from pathlib import Path
 from typing import Callable, TYPE_CHECKING
+from dataclasses import replace
 
 if TYPE_CHECKING:
     from cybertriage.application.services.case_management import CaseManagement
     from cybertriage.adapters.wazuh.indexer_http import WazuhIndexerHttpClient
 
 from cybertriage.application.ports.related_events import RelatedEventSearcher
+from cybertriage.application.ports.retrieval import ContextualKnowledgeRetriever
 
 from langchain_ollama import ChatOllama
 
@@ -92,7 +94,9 @@ def build_knowledge_retriever(
     database_directory: Path,
     sources_config_path: Path = DEFAULT_SOURCES_CONFIG,
     configuration: KnowledgeConfigurationProvider | None = None,
-) -> HybridKnowledgeRetriever:
+    *,
+    offline_knowledge: bool = False,
+) -> ContextualKnowledgeRetriever:
     settings = _load_knowledge(sources_config_path, configuration)
     if not database_directory.is_dir():
         raise FileNotFoundError(f"Knowledge database directory not found: {database_directory}")
@@ -100,9 +104,25 @@ def build_knowledge_retriever(
     if not collections:
         raise ValueError("Enable at least one knowledge source in sources.yaml.")
     embeddings = RunbookEmbeddings()
-    return HybridKnowledgeRetriever(tuple(ChromaKnowledgeIndex(
+    local = HybridKnowledgeRetriever(tuple(ChromaKnowledgeIndex(
         directory=database_directory, embeddings=embeddings, collection_name=name, create_if_missing=False,
     ) for name in collections))
+    sources = tuple(source for source in settings.live_web.sources
+                    if (source == "mitre" and settings.mitre.enabled) or (source == "microsoft" and settings.microsoft.enabled))
+    if offline_knowledge or not settings.live_web.enabled or not sources:
+        return local
+    from cybertriage.adapters.knowledge.web_http import ApprovedPublicHttpFetcher
+    from cybertriage.adapters.knowledge.web_parsing import OfficialDocumentationParser
+    from cybertriage.adapters.storage.web_cache_sqlite import SqlitePublicDocumentCache
+    from cybertriage.application.services.live_knowledge import LiveDocumentReader, LiveWebKnowledgeRetriever
+    web = replace(settings.live_web, sources=sources)
+    cache_path = web.cache_path.resolve()
+    if not cache_path.is_relative_to(Path("data").resolve()):
+        raise ValueError("Public web cache must remain under the project's data directory.")
+    return LiveWebKnowledgeRetriever(local, LiveDocumentReader(SqlitePublicDocumentCache(cache_path),
+        ApprovedPublicHttpFetcher(), OfficialDocumentationParser(), web),
+        RecursiveKnowledgeChunker(settings.chunk_size, settings.chunk_overlap), web,
+        chunk_input_limit=min(150000, 256 * (settings.chunk_size - settings.chunk_overlap)))
 
 
 def build_analyze_alert(
@@ -113,9 +133,10 @@ def build_analyze_alert(
     configuration: KnowledgeConfigurationProvider | None = None,
     *,
     investigate: bool = False,
+    offline_knowledge: bool = False,
     password_supplier: Callable[[], str] | None = None,
 ) -> AnalyzeAlert:
-    retriever = build_knowledge_retriever(database_directory, sources_config_path, configuration)
+    retriever = build_knowledge_retriever(database_directory, sources_config_path, configuration, offline_knowledge=offline_knowledge)
 
     ollama = ChatOllama(
         model=model_name or os.environ.get(
@@ -285,6 +306,7 @@ def build_analyze_stored_alert(
     sources_config_path: Path = DEFAULT_SOURCES_CONFIG,
     *,
     investigate: bool = False,
+    offline_knowledge: bool = False,
     password_supplier: Callable[[], str] | None = None,
 ) -> AnalyzeStoredAlert:
     from cybertriage.adapters.storage.alerts_sqlite import (
@@ -313,6 +335,7 @@ def build_analyze_stored_alert(
             model_name=model_name,
             sources_config_path=sources_config_path,
             investigate=investigate,
+            offline_knowledge=offline_knowledge,
             password_supplier=password_supplier,
         ),
         writer=writer,
@@ -333,6 +356,7 @@ def build_analysis_worker(
     retry_delay_seconds: int = 30,
     poll_seconds: float = 2.0,
     investigate: bool = False,
+    offline_knowledge: bool = False,
     password_supplier: Callable[[], str] | None = None,
 ) -> AnalysisWorker:
     from cybertriage.adapters.storage.alerts_sqlite import (
@@ -372,6 +396,7 @@ def build_analysis_worker(
             model_name=model_name,
             sources_config_path=sources_config_path,
             investigate=investigate,
+            offline_knowledge=offline_knowledge,
             password_supplier=password_supplier,
         ),
         completer=queue,

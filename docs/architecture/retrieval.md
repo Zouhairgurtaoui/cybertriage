@@ -136,9 +136,12 @@ and output limits, concurrent contexts, metadata-only refresh, and analysis
 provenance/backward compatibility. Only validation reports are written under
 ignored `data/validation/retrieval-*`. These checks have not yet been executed.
 
-Controlled live web retrieval, freshness/TTL policy, source-specific web caches,
-and a labelled real-query retrieval benchmark remain separate work. No incident
-query is automatically sent to an internet search service by this feature.
+The configured live wrapper augments local references using identifier-based
+Microsoft/MITRE lookups, bounded caches and freshness provenance; see
+[live knowledge retrieval](live-web.md). Its trace retains local ranking under
+`local_candidate_trace` and separately records final selections. A labelled
+real-query retrieval benchmark remains future work. Incident queries are not
+automatically submitted to an internet search API.
 
 ## SDK references
 

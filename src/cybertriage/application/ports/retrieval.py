@@ -1,6 +1,7 @@
 from typing import Protocol
 
 from cybertriage.domain.retrieval import IndexedPassage, RetrievalContext, RetrievalOutcome
+from cybertriage.application.ports.triage import KnowledgeRetriever
 
 
 class KnowledgeCandidateSource(Protocol):
@@ -11,5 +12,5 @@ class KnowledgeCandidateSource(Protocol):
     def dense_candidates(self, query: str, limit: int) -> tuple[IndexedPassage, ...]: ...
 
 
-class ContextualKnowledgeRetriever(Protocol):
+class ContextualKnowledgeRetriever(KnowledgeRetriever, Protocol):
     def retrieve_for(self, query: str, context: RetrievalContext, k: int) -> RetrievalOutcome: ...

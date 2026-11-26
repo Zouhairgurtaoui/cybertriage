@@ -15,6 +15,11 @@ Implemented code paths:
   citations with persisted query-local ranking provenance.
 - Metadata-only refresh for existing Chroma chunks, latest-fetched snapshot
   selection and a retrieval inspection CLI without chat-model generation.
+- Identifier-based live Microsoft/MITRE augmentation with fixed vendor routes,
+  public-IP-pinned TLS, bounded requests/articles, TTL/conditional/negative caching,
+  refresh leases/backoff, and per-reference freshness provenance.
+- Offline knowledge overrides for retrieval, direct analysis, stored alerts and
+  workers; public lookup failures remain visible while local context is retained.
 - Local Windows Security catalogue with exact provider/channel/event-ID lookup.
 - Validated local catalogue snapshots and atomic replacement.
 - Five-section text analysis through a small model port.
@@ -70,7 +75,8 @@ application data; the model is not required to generate JSON.
 
 - Automatic cross-technique case correlation and Neo4j/Cyber Kill Chain projection.
 - Live scoped-worker validation and additional investigation tools.
-- Labelled retrieval relevance evaluation and controlled, cached live web retrieval.
+- Labelled retrieval relevance evaluation, live source compatibility/workload
+  validation, and additional source providers/discovery strategies.
 - Real-model grounding/report-quality evaluation and operational workload validation.
 - Authenticated analyst review, stored approvals and audit records.
 - Allowlisted response executors connected to the response policy.
@@ -125,4 +131,10 @@ concurrent provenance, metadata upgrades and analysis compatibility. They have
 not yet been executed. Real-query relevance and model grounding gains have not
 yet been measured. Existing collections need source refresh to gain explicit
 platform metadata; finish ingestion and restart analysis before using that corpus.
+
+`scripts/validate_live_web.py` adds 22 offline check groups for public route and
+privacy boundaries, DNS/TLS/HTTP handling, article parsing, cache freshness and
+leases, backoff, quotas/rollback, reference selection and configuration. They
+have not yet been executed. Live vendor compatibility and retrieval/model-quality
+gains remain unmeasured; the code is not an operational validation result.
 
