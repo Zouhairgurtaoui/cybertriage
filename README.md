@@ -37,9 +37,6 @@ authorize a response. Missing events and incomplete searches remain evidence gap
 
 ## Run with Docker
 
-Docker starts the frontend, APIs and workers together. **Wazuh, Active Directory
-and Ollama run outside this stack.** Node and Python are built into the images.
-
 You need:
 
 - Docker Engine with Compose on Linux, or Docker Desktop on Windows.
@@ -56,11 +53,7 @@ From the repository root, run the launcher for your operating system:
 | `bash scripts/cybertriage.sh configure` | `./scripts/cybertriage.ps1 configure` |
 
 The launcher prompts privately for the ingestion token and Indexer password.
-Existing configuration is preserved. On a new setup it creates a local analyst
-credential, displays its token **once**, and stores only its hash. Keep that token
-in a password manager; it expires after 30 days. Its permissions cover
-investigation and review, without response execution.
-
+Existing configuration is preserved. 
 Edit `.env.docker.local` and copy the **public** Indexer CA to
 `config/certs/indexer-ca.pem`:
 
@@ -71,8 +64,6 @@ Edit `.env.docker.local` and copy the **public** Indexer CA to
 | `CYBERTRIAGE_OLLAMA_URL` | Linux defaults to `http://127.0.0.1:11434`; Windows uses `http://host.docker.internal:11434`. |
 | `CYBERTRIAGE_MODEL` | An installed chat-model tag; default `qwen3:4b-instruct`. |
 
-Credentials and local configuration are ignored by Git. An existing analyst
-configuration is never replaced; its original token remains the login credential.
 See [analyst authentication](docs/architecture/analyst-api.md) for permissions,
 expiry and credential rotation.
 
