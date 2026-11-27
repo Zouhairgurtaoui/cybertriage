@@ -67,11 +67,26 @@ def generation_slot():
 def invoke_model(model, messages):
     with generation_slot():
         start = time.monotonic()
-        logger.info("Model generation request started; read_timeout_seconds=%s", model_timeout_seconds())
+        items = messages.to_messages() if hasattr(messages,"to_messages") else messages
+        message_bytes = sum(len(message.content.encode("utf-8")) for message in items if isinstance(message.content,str))
+        logger.info("Model generation request started; read_timeout_seconds=%s message_bytes=%s", model_timeout_seconds(),message_bytes)
         try:
             answer = model.invoke(messages)
         except httpx.TimeoutException as error:
             logger.warning("Model generation timed out after %.1fs", time.monotonic()-start)
             raise TimeoutError("Model generation did not respond within its configured transport timeout.") from error
-        logger.info("Model generation response received after %.1fs", time.monotonic()-start)
+        metadata = answer.response_metadata if isinstance(getattr(answer,"response_metadata",None),dict) else {}
+        def number(key):
+            value = metadata.get(key)
+            return value if type(value) is int and value>=0 else None
+        def seconds(key):
+            value = number(key)
+            return round(value/1_000_000_000,3) if value is not None else None
+        reason = metadata.get("done_reason")
+        reason = reason if isinstance(reason,str) and reason in {"stop","length","load","unload"} else "other"
+        output_tokens,decode_seconds = number("eval_count"),seconds("eval_duration")
+        rate = round(output_tokens/decode_seconds,2) if output_tokens is not None and decode_seconds else None
+        logger.info("Model response received after %.1fs finish=%s input_tokens=%s output_tokens=%s load_seconds=%s prompt_seconds=%s decode_seconds=%s tokens_per_second=%s",
+            time.monotonic()-start,reason,number("prompt_eval_count"),output_tokens,seconds("load_duration"),
+            seconds("prompt_eval_duration"),decode_seconds,rate)
         return answer

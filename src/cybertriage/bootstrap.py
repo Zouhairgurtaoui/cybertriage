@@ -193,7 +193,7 @@ def build_analyze_alert(
     return AnalyzeAlert(
         retriever=retriever,
         model=OllamaTriageModel(ollama,invoker=invoke_model),
-        retrieval_limit=3,
+        retrieval_limit=2 if conversation else 3,
         catalog=catalog,
         investigator=investigator,
         contextual_retriever=retriever,

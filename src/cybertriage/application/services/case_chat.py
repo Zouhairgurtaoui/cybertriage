@@ -46,7 +46,28 @@ class ProcessCaseChat:
             item = asdict(alert)
             item["timestamp"] = alert.timestamp.isoformat()
             item["decoded_data"] = json.loads(item.pop("decoded_data_json"))
-            entries.append({"record_id": record_id, "alert": item,
+            omitted = []
+            if item["decoded_data"] and item.get("full_log"):
+                # Omit only provably repeated JSON payloads, not free-text evidence.
+                def unique_object(pairs):
+                    value = {}
+                    for name,content in pairs:
+                        if name in value:
+                            raise ValueError("Duplicate raw-log key.")
+                        value[name] = content
+                    return value
+                try:
+                    raw_payload = json.loads(item["full_log"],object_pairs_hook=unique_object)
+                    canonical = lambda value: json.dumps(value,sort_keys=True,ensure_ascii=False,allow_nan=False)
+                    repeated = isinstance(raw_payload,dict) and (
+                        canonical(raw_payload)==canonical(item["decoded_data"]) or
+                        ("win" in item["decoded_data"] and canonical(raw_payload)==canonical(item["decoded_data"]["win"])))
+                except (TypeError,ValueError,RecursionError):
+                    repeated = False
+                if repeated:
+                    item.pop("full_log")
+                    omitted.append("full_log")
+            entries.append({"record_id": record_id, "alert": item, "model_omitted_fields": omitted,
                             "grounding": dict(self._grounder.ground_alert(alert))})
         scope = None
         if snapshot["mode"] == "investigate":

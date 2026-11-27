@@ -144,3 +144,19 @@ Password sessions are stored as digests under `data/auth/`. They are separate
 from case evidence and can be invalidated by revocation, account-policy changes
 or expiry. Keep that directory private to the service identity and back it up
 according to the deployment's authentication policy.
+
+Model completion logs include the stop reason, input/output token counts,
+load/prompt/decode durations and generation rate when Ollama supplies them.
+This separates slot waiting, prompt processing and token generation without
+logging incident text. A CPU-only execution path can have different latency
+from a short baseline prompt as case context grows.
+
+Case conversations use concise instructions and two retrieved chunks, with the
+exact event definition retained when available. Duplicate raw-log text is
+excluded only when its JSON repeats the decoded payload, with an explicit projection omission.
+Raw source alerts remain retained. Incomplete responses remain rejected rather
+than presented as complete reviews; they end the turn without unchanged retries.
+
+After rebuilding the backend image, recreate all model workers that must receive
+its changes, including `case-chat-worker`. Recreating only the frontend and
+analyst API leaves existing worker containers on their previous image/config.

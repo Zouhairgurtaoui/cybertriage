@@ -3,6 +3,18 @@ from typing import Literal
 from cybertriage.domain.investigation import AuthenticationScope
 
 
+class InvalidModelResponseError(RuntimeError):
+    """A completed request did not produce an acceptable agent response."""
+
+
+class IncompleteModelResponseError(InvalidModelResponseError):
+    """Generation stopped before a complete response was produced."""
+
+
+class ModelContextLimitError(InvalidModelResponseError):
+    """The assembled request exceeds its context budget."""
+
+
 @dataclass(frozen=True)
 class ToolExecution:
     call_id: str

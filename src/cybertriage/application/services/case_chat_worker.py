@@ -5,6 +5,7 @@ from threading import Event, Thread
 
 from cybertriage.application.ports.case_chat import ChatQueue, ChatTurnProcessor
 from cybertriage.domain.case import CaseError, CaseStorageError
+from cybertriage.domain.agent import InvalidModelResponseError, IncompleteModelResponseError, ModelContextLimitError
 from cybertriage.domain.case_chat import ChatClaim, ChatLeaseLostError
 
 logger = logging.getLogger(__name__)
@@ -44,8 +45,12 @@ class CaseChatWorker:
             except Exception as error:
                 logger.warning("Chat turn failed turn=%s error_type=%s", claim.turn_id, type(error).__name__)
                 try:
-                    self._queue.fail(claim, "generation_timeout" if isinstance(error, TimeoutError) else "invalid_context" if isinstance(error, (CaseError, ValueError)) else "generation_failed",
-                                     not isinstance(error, (CaseError, ValueError, TimeoutError)))
+                    code = ("output_incomplete" if isinstance(error,IncompleteModelResponseError) else
+                            "model_context_limit" if isinstance(error,ModelContextLimitError) else
+                            "model_response_invalid" if isinstance(error,InvalidModelResponseError) else
+                            "generation_timeout" if isinstance(error,TimeoutError) else
+                            "invalid_context" if isinstance(error,(CaseError,ValueError)) else "generation_failed")
+                    self._queue.fail(claim,code,not isinstance(error,(CaseError,ValueError,TimeoutError,InvalidModelResponseError)))
                 except (ChatLeaseLostError, CaseStorageError):
                     logger.warning("Chat failure update unavailable turn=%s", claim.turn_id)
             finally:

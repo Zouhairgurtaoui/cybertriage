@@ -27,13 +27,17 @@ Conversation storage retains the whole thread up to its 1,000-turn limit. Each
 model request receives a bounded snapshot: up to eight recent turns, excerpts
 of earlier answers, historical query summaries and up to two linked report excerpts. History that does not
 fit the context budget is omitted with a visible indicator. The model does not
-receive unlimited memory. Full selected alert evidence must fit the input
-budget; excessive context produces an explicit failure instead of a partial
-accepted reply.
+receive unlimited memory. Selected alert projections must fit the input budget.
+When raw `full_log` JSON repeats the decoded payload, it is excluded from the model
+projection to avoid repetition; the omission is recorded and the original alert
+remains available in Evidence. Excessive context produces an explicit failure
+instead of a partial accepted reply. Conversation answers normally stay within
+200 words, with two retrieved knowledge chunks plus any exact event definition.
 
 One turn can be pending/running per case. Submission keys make retries
 idempotent. The worker uses renewable leases and at most three attempts; a stale
-worker cannot save a reply. A failed turn remains in history and can be followed
+worker cannot save a reply. Incomplete output and context-budget failures end
+the turn without repeating an unchanged generation. A failed turn remains in history and can be followed
 by a new message after the cause is resolved. Responses opens the separate
 proposal/approval workflow. Chat never grants response authority.
 

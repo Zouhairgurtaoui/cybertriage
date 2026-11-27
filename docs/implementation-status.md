@@ -226,3 +226,13 @@ shared local generation scheduling prevents concurrent generation by this stack.
 Chat timeouts are terminal for the turn, with technical diagnostics in worker
 logs. Authentication security, browser sign-out and renewed live generation
 acceptance remain pending; static checks do not establish runtime correctness.
+
+## Conversation latency diagnostics
+
+Conversation prompts are shorter and retrieve two knowledge chunks while
+retaining exact event definitions. Their disclosed alert projection omits raw
+log JSON only when it repeats the decoded payload. Source alerts remain retained unchanged.
+Server logs record model completion/timing metadata and distinguish unfinished
+output, malformed responses and context limits. Incomplete or oversized output
+is rejected without repeatedly generating the same failed chat turn. Runtime
+latency improvements and successful live-case completion remain unmeasured.
