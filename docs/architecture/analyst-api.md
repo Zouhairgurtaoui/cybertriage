@@ -1,7 +1,7 @@
 # Analyst API
 
 The analyst API is a separate FastAPI application and listener from Wazuh
-ingestion. It accepts per-analyst bearer credentials with explicit permissions,
+ingestion. It accepts password-issued sessions and existing per-analyst API tokens with explicit permissions,
 case scope and expiry. The ingestion token grants no analyst capability.
 Installation, credential generation and startup commands are in the README.
 The React application is built and served separately. This listener serves JSON
@@ -18,7 +18,7 @@ revocation does not automatically cancel them.
 
 The server supplies the analyst ID to audit services. Request models reject
 extra fields, including client-supplied actor or approval-authority overrides.
-These are API credentials, not browser login sessions or an OIDC implementation.
+Password login issues opaque server-side sessions; this is not an OIDC implementation.
 The separate React application keeps tokens in page memory and uses a same-origin
 API proxy. A future identity-provider/session adapter can replace token entry
 without changing case and response services. No cookies, cross-origin credentials
@@ -56,6 +56,7 @@ requires a dedicated entitlement model; case membership alone does not provide i
 
 | Route family | Behavior |
 | --- | --- |
+| `/api/v1/auth/login`, `/api/v1/auth/logout` | Password login and explicit session revocation. |
 | `/api/v1/me`, `/api/v1/schema` | Current permissions and authenticated OpenAPI contract. |
 | `/api/v1/alerts`, `/api/v1/alerts/{record_id}` | Bounded retained-alert inbox and evidence detail; global evidence scope required. |
 | `/api/v1/analyses`, `/api/v1/analyses/{analysis_id}` | Newest-first saved reports, optional alert coverage filter and retained report detail; global scope plus `reports:read_all` required. |
@@ -133,3 +134,32 @@ Alert details expose a limited job projection (ID, status, attempt count and
 error code). Grouped members resolve to the representative automatic job;
 claim tokens and lease ownership are not exposed. Neither report visibility nor
 job completion changes case findings or response authorization.
+
+## Password login and sessions
+
+`POST /api/v1/auth/login` accepts a username/password and returns a new opaque
+bearer token, its type and expiry. Passwords use fixed-cost scrypt
+(N=131072, r=8, p=1) with a distinct 16-byte salt and a 32-byte derived hash,
+following [OWASP's scrypt guidance](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html).
+Provisioning requires the local `analyst-password` command and an existing
+principal; it cannot grant roles, create an administrator or change case scope.
+No default password or public registration endpoint exists.
+
+Sessions expire after at most 15 minutes and never outlive their analyst
+configuration expiry. Only the token's SHA-256 digest is stored in the ignored
+session database. Authentication reloads the account policy; password, username,
+permission, scope or credential-expiry changes invalidate existing sessions.
+`POST /api/v1/auth/logout` revokes the supplied session. Up to five active
+sessions are retained per username; older sessions are revoked on new login.
+
+Persistent login limits cover both the normalized username and direct client
+address; forwarded headers do not grant a new throttle identity. Unknown users
+pay the same password hashing cost, and concurrent hash work is bounded.
+Responses use generic credential errors. API tokens remain compatible with the
+existing configuration and expiry rules.
+
+The browser retains a session bearer only in memory. A copied bearer can still
+be replayed until revocation or expiry; username/password login limits exposure
+but does not bind requests to a device. HTTPS protects credentials and bearer
+transport outside loopback development. Server-side expiry and revocation follow
+[OWASP session-management guidance](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html).

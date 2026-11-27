@@ -44,8 +44,8 @@ class CaseChatWorker:
             except Exception as error:
                 logger.warning("Chat turn failed turn=%s error_type=%s", claim.turn_id, type(error).__name__)
                 try:
-                    self._queue.fail(claim, "invalid_context" if isinstance(error, (CaseError, ValueError)) else "generation_failed",
-                                     not isinstance(error, (CaseError, ValueError)))
+                    self._queue.fail(claim, "generation_timeout" if isinstance(error, TimeoutError) else "invalid_context" if isinstance(error, (CaseError, ValueError)) else "generation_failed",
+                                     not isinstance(error, (CaseError, ValueError, TimeoutError)))
                 except (ChatLeaseLostError, CaseStorageError):
                     logger.warning("Chat failure update unavailable turn=%s", claim.turn_id)
             finally:

@@ -215,3 +215,14 @@ coverage; case-only replies stay in the conversation without fabricated alerts.
 Review mode disables tools. Investigation mode uses existing derived query
 scopes. The React thread, sidebar history and source viewer are implemented;
 functional concurrency, browser and live-model acceptance remains pending.
+
+## Password sessions and local generation scheduling
+
+Username/password login, fixed-cost scrypt hashes, persistent login throttling,
+15-minute revocable sessions and the existing API-token method are implemented.
+Local provisioning retains the principal's current permissions and case scope.
+Model reads default to 600 seconds with a separate short connection timeout;
+shared local generation scheduling prevents concurrent generation by this stack.
+Chat timeouts are terminal for the turn, with technical diagnostics in worker
+logs. Authentication security, browser sign-out and renewed live generation
+acceptance remain pending; static checks do not establish runtime correctness.

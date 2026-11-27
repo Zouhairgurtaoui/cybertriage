@@ -20,8 +20,25 @@ export class ApiClient {
     try { return await this.request("/api/v1/me"); }
     catch (error) { this.clear(); throw error; }
   }
-  async request(path, {method = "GET", body, signal, timeout = method === "GET" ? 30000 : 180000} = {}) {
-    if (!path.startsWith("/api/v1/") || path.startsWith("//") || !this.#token) throw new ApiError("Connect to the workspace first.", 401);
+  async login(username, password) {
+    this.clear();
+    const session=await this.request("/api/v1/auth/login",{method:"POST",body:{username,password},authenticated:false,timeout:15000});
+    if(typeof session.access_token!=="string"||!/^cts_[A-Za-z0-9_-]{43}$/.test(session.access_token)||!Number.isFinite(Date.parse(session.expires_at)))throw new ApiError("The server returned an invalid session.",502);
+    this.#token=session.access_token;
+    try{return {...await this.request("/api/v1/me"),session_expires_at:session.expires_at};}
+    catch(error){this.clear();throw error;}
+  }
+  async disconnect() {
+    const token=this.#token;this.clear();
+    if(!token.startsWith("cts_"))return;
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),5000);
+    try{
+      const response=await fetch("/api/v1/auth/logout",{method:"POST",headers:{Authorization:`Bearer ${token}`,Accept:"application/json"},credentials:"omit",cache:"no-store",redirect:"error",keepalive:true,signal:controller.signal});
+      if(!response.ok)throw new ApiError("Server sign-out could not be confirmed. The session will still expire automatically.",response.status);
+    }finally{clearTimeout(timer);}
+  }
+  async request(path, {method = "GET", body, signal, authenticated = true, timeout = method === "GET" ? 30000 : 180000} = {}) {
+    if (!path.startsWith("/api/v1/") || path.startsWith("//") || (authenticated&&!this.#token) || (!authenticated&&(path!=="/api/v1/auth/login"||method!=="POST"))) throw new ApiError("Connect to the workspace first.", 401);
     const url = new URL(path, location.origin);
     if (url.origin !== location.origin || url.hash) throw new ApiError("Only this workspace's API can be contacted.", 400);
     const generation = this.#generation, controller = new AbortController();
@@ -33,11 +50,11 @@ export class ApiClient {
     const changed = method !== "GET";
     let receivedStatus = 0;
     try {
-      const response = await fetch(url, {method, headers: {Authorization: `Bearer ${this.#token}`, Accept: "application/json", ...(body === undefined ? {} : {"Content-Type": "application/json"})},
+      const response = await fetch(url, {method, headers: {...(authenticated?{Authorization:`Bearer ${this.#token}`} : {}), Accept: "application/json", ...(body === undefined ? {} : {"Content-Type": "application/json"})},
         body: body === undefined ? undefined : JSON.stringify(body), credentials: "omit", cache: "no-store", redirect: "error", signal: controller.signal});
       receivedStatus = response.status;
       if (generation !== this.#generation || signal?.aborted) throw new DOMException("Request cancelled", "AbortError");
-      if (response.status === 401) {
+      if (response.status === 401 && authenticated) {
         this.clear(); this.onUnauthorized();
         throw new ApiError("Your credential expired or was revoked. Connect again.", 401);
       }

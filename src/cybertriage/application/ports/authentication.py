@@ -1,0 +1,19 @@
+from collections.abc import Mapping
+from typing import Protocol
+
+from cybertriage.domain.authentication import PasswordIdentity
+
+
+class PasswordIdentities(Protocol):
+    def password_identity(self, username: str) -> PasswordIdentity | None: ...
+
+
+class PasswordHasher(Protocol):
+    def verify(self, password: str, encoded: str | None) -> bool: ...
+
+
+class SessionRepository(Protocol):
+    def admit_login(self, username: str, client: str) -> None: ...
+    def create(self, token_hash: str, username: str, revision: str, expires_at: int) -> None: ...
+    def get_active(self, token_hash: str) -> Mapping[str, object] | None: ...
+    def revoke(self, token_hash: str) -> None: ...

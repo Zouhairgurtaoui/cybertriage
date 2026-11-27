@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from langchain_ollama import ChatOllama
 
 from cybertriage.adapters.models.triage_prompt import TRIAGE_PROMPT
@@ -6,8 +7,9 @@ from cybertriage.adapters.models.reference_formatting import format_reference
 
 
 class OllamaTriageModel:
-    def __init__(self, model: ChatOllama):
+    def __init__(self, model: ChatOllama, *, invoker: Callable | None = None):
         self._model = model
+        self._invoke = invoker or (lambda client,messages: client.invoke(messages))
 
     def analyze(
         self,
@@ -23,7 +25,7 @@ class OllamaTriageModel:
             "evidence": evidence,
             "references": self._format_references(references),
         })
-        answer = self._model.invoke(prompt)
+        answer = self._invoke(self._model, prompt)
 
         if answer.response_metadata.get("done_reason") != "stop":
             raise RuntimeError(

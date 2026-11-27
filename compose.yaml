@@ -32,6 +32,7 @@ x-backend: &backend
 x-model-environment: &model-environment
   CYBERTRIAGE_OLLAMA_URL: "${CYBERTRIAGE_OLLAMA_URL:-http://host.docker.internal:11434}"
   CYBERTRIAGE_MODEL: "${CYBERTRIAGE_MODEL:-qwen3:4b-instruct}"
+  CYBERTRIAGE_MODEL_TIMEOUT_SECONDS: "${CYBERTRIAGE_MODEL_TIMEOUT_SECONDS:-600}"
   CYBERTRIAGE_INDEXER_URL: "${CYBERTRIAGE_INDEXER_URL:?Configure a reachable certificate-matching Indexer URL}"
   CYBERTRIAGE_INDEXER_USERNAME: "${CYBERTRIAGE_INDEXER_USERNAME:?Configure the read-only Indexer username}"
   CYBERTRIAGE_INDEXER_CA_BUNDLE: /run/indexer-ca.pem

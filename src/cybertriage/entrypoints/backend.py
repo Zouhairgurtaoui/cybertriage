@@ -13,13 +13,14 @@ from hashlib import sha256
 from pathlib import Path
 from threading import Event
 
-COMMANDS = {"case-chat-worker", "analyst-key", "serve-analyst", "request-investigation", "investigation-status", "investigation-worker", "graph-worker", "case-candidates"}
+COMMANDS = {"analyst-password", "case-chat-worker", "analyst-key", "serve-analyst", "request-investigation", "investigation-status", "investigation-worker", "graph-worker", "case-candidates"}
 
 
 def register_backend_commands(commands):
     for name in sorted(COMMANDS):
         parser = commands.add_parser(name, help={
             "case-chat-worker": "Process persistent case conversations with bounded read-only tools.",
+            "analyst-password": "Set a username/password for an existing analyst; password input is hidden.",
             "analyst-key": "Generate an analyst bearer token and its configuration hash; display the token once.",
             "serve-analyst": "Run the separately authenticated analyst API.",
             "request-investigation": "Queue an explicit case re-investigation without replacing automatic jobs.",
@@ -29,6 +30,11 @@ def register_backend_commands(commands):
             "case-candidates": "Suggest related retained alerts without attaching or classifying them.",
         }[name])
         if name == "analyst-key":
+            continue
+        if name == "analyst-password":
+            parser.add_argument("--credentials",type=Path,default=Path("config/analysts.local.yaml"))
+            parser.add_argument("--analyst-id",required=True)
+            parser.add_argument("--username",required=True)
             continue
         parser.add_argument("--alerts-database", type=Path, default=Path("data/alerts/alerts.sqlite3"))
         if name == "serve-analyst":
@@ -74,6 +80,18 @@ def dispatch_backend_command(args: argparse.Namespace) -> bool:
     if name == "analyst-key":
         token = secrets.token_urlsafe(32)
         print(json.dumps({"token": token, "token_sha256": sha256(token.encode("ascii")).hexdigest()}, indent=2))
+        return True
+    if name == "analyst-password":
+        from cybertriage.adapters.configuration.analyst_passwords import set_analyst_password
+        if not sys.stdin.isatty():
+            raise ValueError("Run analyst-password in an interactive terminal; passwords cannot be supplied as arguments.")
+        password=getpass.getpass("New password (15-128 characters): ")
+        confirmation=getpass.getpass("Confirm password: ")
+        if password!=confirmation:
+            raise ValueError("Passwords do not match.")
+        set_analyst_password(args.credentials,args.analyst_id,args.username,password)
+        password=confirmation=None
+        print("Password login configured. Existing API token and permissions were retained. Recreate the analyst API container to reload its configuration mount.")
         return True
     if name == "serve-analyst":
         import uvicorn

@@ -53,7 +53,7 @@ From the repository root, run the launcher for your operating system:
 | `bash scripts/cybertriage.sh configure` | `./scripts/cybertriage.ps1 configure` |
 
 The launcher prompts privately for the ingestion token and Indexer password.
-Existing configuration is preserved. 
+Existing configuration is preserved.
 Edit `.env.docker.local` and copy the **public** Indexer CA to
 `config/certs/indexer-ca.pem`:
 
@@ -63,7 +63,19 @@ Edit `.env.docker.local` and copy the **public** Indexer CA to
 | `CYBERTRIAGE_INDEXER_USERNAME` | Read-only Indexer account. |
 | `CYBERTRIAGE_OLLAMA_URL` | Linux defaults to `http://127.0.0.1:11434`; Windows uses `http://host.docker.internal:11434`. |
 | `CYBERTRIAGE_MODEL` | An installed chat-model tag; default `qwen3:4b-instruct`. |
+| `CYBERTRIAGE_MODEL_TIMEOUT_SECONDS` | Model read timeout; default `600` seconds, with a 5-second connection timeout. |
 
+The login screen defaults to username/password. To provision it for an existing
+analyst, run the installed project CLI in an interactive terminal:
+
+```bash
+python -m cybertriage analyst-password --analyst-id local-analyst --username local-analyst
+```
+
+The command prompts privately, stores a salted scrypt hash, and preserves the
+analyst's existing permissions and API token. Recreate the analyst API container
+after changing its mounted credential file. **API token** remains an alternative
+on the login screen. Password login issues a revocable 15-minute bearer session.
 See [analyst authentication](docs/architecture/analyst-api.md) for permissions,
 expiry and credential rotation.
 
@@ -108,7 +120,8 @@ bash scripts/cybertriage.sh start
 ./scripts/cybertriage.ps1 start
 ```
 
-Open **http://127.0.0.1:5173** and sign in with your analyst token. The ingestion
+Open **http://127.0.0.1:5173** and sign in with your provisioned username/password,
+or select **API token** to use an existing token. The ingestion
 endpoint is **http://127.0.0.1:8000/api/v1/alerts/wazuh**. Wazuh on a VM needs an
 existing secure host transport to that endpoint; guest localhost is a different
 machine. See [operations](docs/operations.md) for connectivity and process details.

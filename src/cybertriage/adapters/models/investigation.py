@@ -170,6 +170,7 @@ class OllamaInvestigationModel:
         *,
         scoped_tool_factory: Callable[[AuthenticationScope], Sequence[StructuredTool]] | None = None,
         conversation: bool = False,
+        invoker: Callable | None = None,
     ):
         if not tools:
             raise ValueError("Register at least one investigation tool.")
@@ -179,6 +180,7 @@ class OllamaInvestigationModel:
         if len(self._tools) != len(tools):
             raise ValueError("Investigation tool names must be unique.")
 
+        self._invoke = invoker or (lambda client,messages: client.invoke(messages))
         self._model = model
         self._model_with_tools = model.bind_tools(list(tools))
         self._scoped_tool_factory = scoped_tool_factory
@@ -272,10 +274,10 @@ class OllamaInvestigationModel:
             _check_context(messages)
 
             if allow_tools:
-                raw_answer = model_with_tools.invoke(messages)
+                raw_answer = self._invoke(model_with_tools, messages)
             else:
                 # Use the original model without tool definitions.
-                raw_answer = self._model.invoke(messages)
+                raw_answer = self._invoke(self._model, messages)
 
             answer = _validate_answer(raw_answer)
 

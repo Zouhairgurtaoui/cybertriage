@@ -108,5 +108,8 @@ dispatch. Reading an agent report requires no firewall configuration.
 Execution needs enabled server policy, a configured executor and the appropriate
 credential permissions. See the [response workflow](architecture/response-workflow.md).
 
-The console keeps the analyst token in page memory. Locking, reloading or
-inactivity ends the browser session; server-side credential expiry still applies.
+Sign in with your provisioned username/password, or select API token for an
+existing integration credential. Password login creates a 15-minute session.
+The console keeps its bearer in page memory; Lock signs out and requests server
+revocation. Reloading requires signing in again. Case conversations remain saved
+when a login session expires.

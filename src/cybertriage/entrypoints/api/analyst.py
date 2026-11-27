@@ -18,6 +18,7 @@ from cybertriage.adapters.storage.analyst_read_sqlite import SqliteAnalystAlertR
 from cybertriage.application.ports.analyst_read import AnalystAlertReader
 from cybertriage.bootstrap import build_case_graph_export, build_case_management, build_case_stages, build_response_runtime
 from cybertriage.domain.analyst import AnalystPrincipal
+from cybertriage.domain.authentication import AuthenticationStorageError, LoginRateLimitedError
 from cybertriage.domain.case import CaseConflictError, CaseError, CaseStorageError
 from cybertriage.domain.graph import GraphError, GraphStorageError
 from cybertriage.domain.response_workflow import ResponseConflictError, ResponseError, ResponseStorageError
@@ -29,6 +30,11 @@ from cybertriage.entrypoints.api.app import _read_payload
 
 class Body(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
+
+
+class Login(Body):
+    username: str = Field(min_length=1, max_length=64)
+    password: str = Field(min_length=1, max_length=128, repr=False)
 
 
 class CreateCase(Body):
@@ -125,6 +131,8 @@ class Feedback(Body):
 def create_analyst_app(database: Path, credentials: Path, response_config: Path, firewalls_config: Path) -> FastAPI:
     keys = AnalystKeyStore(credentials)
     keys.load()  # Fail closed on absent/invalid credentials before opening a listener.
+    from cybertriage.bootstrap import build_analyst_sessions
+    sessions = build_analyst_sessions(database,keys)
     cases, stages = build_case_management(database), build_case_stages(database)
     requests = SqliteInvestigationRequests(database)
     from cybertriage.bootstrap import build_case_conversation
@@ -139,7 +147,9 @@ def create_analyst_app(database: Path, credentials: Path, response_config: Path,
         if len(request.headers.getlist("authorization")) != 1 or credentials is None:
             raise HTTPException(401, "Analyst authentication required.", headers={"WWW-Authenticate": "Bearer"})
         try:
-            identity = await run_in_threadpool(keys.authenticate, credentials.credentials)
+            identity = await run_in_threadpool(sessions.authenticate, credentials.credentials)
+            if identity is None:
+                identity = await run_in_threadpool(keys.authenticate, credentials.credentials)
         except (ValueError, OSError):
             raise HTTPException(503, "Analyst authentication configuration is unavailable.") from None
         if identity is None:
@@ -198,7 +208,7 @@ def create_analyst_app(database: Path, credentials: Path, response_config: Path,
         register_error(error, 409)
     for error in (CaseError, ResponseError, GraphError, ValueError):
         register_error(error, 400)
-    for error in (CaseStorageError, ResponseStorageError, GraphStorageError, AnalysisStorageError, JobStorageError, TriageReviewError):
+    for error in (CaseStorageError, ResponseStorageError, GraphStorageError, AnalysisStorageError, JobStorageError, TriageReviewError, AuthenticationStorageError):
         register_error(error, 503, "Application storage is unavailable.")
 
     @app.get("/healthz")
@@ -208,6 +218,27 @@ def create_analyst_app(database: Path, credentials: Path, response_config: Path,
     @app.get("/api/v1/schema")
     async def schema(identity=Depends(permission("cases:read"))):
         return app.openapi()
+
+    @app.post("/api/v1/auth/login")
+    async def password_login(request: Request):
+        data = await body(request,Login)
+        client = request.client.host if request.client else "unknown"
+        try:
+            result = await run_in_threadpool(sessions.login,data.username,data.password,client)
+        except LoginRateLimitedError:
+            raise HTTPException(429,"Too many login attempts. Try again later.",headers={"Retry-After":"300"}) from None
+        except (ValueError,OSError):
+            raise HTTPException(503,"Analyst login configuration is unavailable.") from None
+        if result is None:
+            raise HTTPException(401,"Invalid username or password.")
+        return result
+
+    @app.post("/api/v1/auth/logout")
+    async def password_logout(request: Request, credential: HTTPAuthorizationCredentials | None = Depends(bearer)):
+        if len(request.headers.getlist("authorization")) != 1 or credential is None:
+            raise HTTPException(401,"Analyst session credential required.")
+        await run_in_threadpool(sessions.logout,credential.credentials)
+        return {"status":"signed_out"}
 
     @app.get("/api/v1/me")
     async def me(identity=Depends(principal)):
@@ -457,6 +488,7 @@ def create_analyst_app(database: Path, credentials: Path, response_config: Path,
             identity.analyst_id, data.reason, data.evidence)
 
     contracts = {
+        ("post", "/api/v1/auth/login"): Login,
         ("post", "/api/v1/cases"): CreateCase,
         ("patch", "/api/v1/cases/{case_id}"): UpdateCase,
         ("post", "/api/v1/cases/{case_id}/alerts"): AttachAlerts,

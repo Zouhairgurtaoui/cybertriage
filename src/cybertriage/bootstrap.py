@@ -14,6 +14,7 @@ from cybertriage.application.ports.retrieval import ContextualKnowledgeRetriever
 
 from langchain_ollama import ChatOllama
 from cybertriage.adapters.configuration.ollama_environment import ollama_base_url
+from cybertriage.adapters.models.runtime import invoke_model, model_http_timeout
 
 from cybertriage.adapters.configuration.yaml_files import (
     YamlKnowledgeConfiguration,
@@ -150,7 +151,7 @@ def build_analyze_alert(
         num_ctx=8192,
         num_predict=800,
         reasoning=False,
-        client_kwargs={"timeout": 180.0},
+        client_kwargs={"timeout": model_http_timeout()},
     )
 
     catalog = load_event_catalog(catalog_path) if catalog_path is not None else None
@@ -186,11 +187,12 @@ def build_analyze_alert(
             tools=tools_for_scope(None),
             scoped_tool_factory=tools_for_scope,
             conversation=conversation,
+            invoker=invoke_model,
         )
 
     return AnalyzeAlert(
         retriever=retriever,
-        model=OllamaTriageModel(ollama),
+        model=OllamaTriageModel(ollama,invoker=invoke_model),
         retrieval_limit=3,
         catalog=catalog,
         investigator=investigator,
@@ -576,3 +578,11 @@ def build_case_chat_worker(database_path: Path, database_directory: Path, catalo
                             investigate=True, conversation=True, offline_knowledge=offline_knowledge),
         build_authentication_grounder())
     return CaseChatWorker(queue, processor)
+
+
+def build_analyst_sessions(database: Path, identities):
+    from cybertriage.adapters.configuration.password_hashing import ScryptPasswords
+    from cybertriage.adapters.storage.analyst_sessions_sqlite import SqliteAnalystSessions
+    from cybertriage.application.services.authentication import AnalystSessions
+    repository = SqliteAnalystSessions(database.parent.parent / "auth" / "sessions.sqlite3")
+    return AnalystSessions(identities,ScryptPasswords(),repository)

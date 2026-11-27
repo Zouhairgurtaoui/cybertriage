@@ -218,7 +218,7 @@ class SqliteCaseChat(SqliteCaseRepository):
                 "Provisional agent reply saved; no response authorized.",{"turn_id": claim.turn_id,"reply_id": reply.reply_id})
 
     def fail(self, claim, code, retryable):
-        if code not in {"invalid_context","generation_failed"} or type(retryable) is not bool:
+        if code not in {"invalid_context","generation_failed","generation_timeout"} or type(retryable) is not bool:
             raise ValueError("Invalid chat failure classification.")
         with self._session(True) as connection:
             row = self._owned(connection,claim)

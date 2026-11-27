@@ -9,12 +9,20 @@ import {CaseHistory} from "./features/CaseHistory.jsx";
 import {Quality} from "./features/Quality.jsx";
 
 function Login() {
-  const {login,message}=useSession();
+  const {login,loginPassword,message}=useSession();
+  const [method,setMethod]=useState("password"),[username,setUsername]=useState(""),[password,setPassword]=useState("");
   const [token,setToken]=useState(""),[busy,setBusy]=useState(false),[error,setError]=useState("");
-  async function submit(event){event.preventDefault();const value=token;setToken("");setBusy(true);setError("");try{await login(value);}catch(failure){if(failure.name!=="AbortError")setError(failure.message);}finally{setBusy(false);}}
-  return <main className="login-page"><section className="login-card"><div className="brand"><span className="brand-mark">CT</span><div>CyberTriage<small>Analyst console</small></div></div><h1>Analyst access</h1><p className="muted">Connect with your assigned credential. Access to evidence and response actions follows your analyst permissions.</p>
-    <form onSubmit={submit} autoComplete="off"><label className="field">Access token<input type="password" autoComplete="off" spellCheck={false} value={token} onChange={event=>setToken(event.target.value)} minLength={32} maxLength={512} required/></label><button type="submit" className="button primary wide" disabled={busy}>{busy?"Connecting…":"Connect"}</button></form>
-    {(error||message)&&<Alert error>{error||message}</Alert>}<p className="login-footnote">Credentials stay in page memory. Locking, reloading or inactivity ends this browser session.</p></section></main>;
+  async function submit(event){
+    event.preventDefault();const secret=method==="password"?password:token;
+    setPassword("");setToken("");setBusy(true);setError("");
+    try{if(method==="password")await loginPassword(username.trim(),secret);else await login(secret);}
+    catch(failure){if(failure.name!=="AbortError")setError(failure.message);}
+    finally{setBusy(false);}
+  }
+  return <main className="login-page"><section className="login-card"><div className="brand"><span className="brand-mark">CT</span><div>CyberTriage<small>Analyst console</small></div></div><h1>Analyst access</h1><p className="muted">Sign in to your investigation workspace.</p>
+    <div className="login-methods"><button type="button" className={`button small ${method==="password"?"primary":""}`} disabled={busy} aria-pressed={method==="password"} onClick={()=>{setMethod("password");setToken("");setError("");}}>Username and password</button><button type="button" className={`button small ${method==="token"?"primary":""}`} disabled={busy} aria-pressed={method==="token"} onClick={()=>{setMethod("token");setPassword("");setError("");}}>API token</button></div>
+    <form onSubmit={submit}>{method==="password"?<><label className="field">Username<input name="username" autoComplete="username" spellCheck={false} value={username} onChange={event=>setUsername(event.target.value)} maxLength={64} required disabled={busy}/></label><label className="field">Password<input name="password" type="password" autoComplete="current-password" value={password} onChange={event=>setPassword(event.target.value)} maxLength={128} required disabled={busy}/></label></>:<label className="field">Access token<input type="password" autoComplete="off" spellCheck={false} value={token} onChange={event=>setToken(event.target.value)} minLength={32} maxLength={512} required disabled={busy}/></label>}<button type="submit" className="button primary wide" disabled={busy}>{busy?"Signing in…":"Sign in"}</button></form>
+    {(error||message)&&<Alert error>{error||message}</Alert>}<p className="login-footnote">Password login creates a 15-minute session. Locking signs out that session. Credentials are not stored in browser storage.</p></section></main>;
 }
 function Console() {
   const {identity,can,global,logout}=useSession();

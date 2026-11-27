@@ -119,3 +119,28 @@ Neo4j publication, and an explicitly reviewed OPNsense lab block/removal with
 observed traffic effects. Validate expiry across worker restarts and failure
 reconciliation without enabling broad automatic responses. These runtime checks
 are pending; static code verification does not establish production readiness.
+
+## Model latency and generation timeout
+
+`CYBERTRIAGE_MODEL_TIMEOUT_SECONDS` defaults to 600 (range 30-1800). Ollama
+connections use a 5-second connection timeout; the longer read timeout permits
+slow local generation. Transport reads are bounded individually, not a guarantee
+of total turn duration. Embeddings use the same bounded transport settings.
+
+The composition root supplies a single-host generation invoker. Automatic,
+requested-investigation and chat workers share an advisory generation lock in
+the data volume, so only one generation request is issued at a time. The lock
+wait is bounded and OS ownership is released when a worker exits. All workers
+must use the same data directory to share that limit; independent deployments
+and external Ollama clients are outside this boundary.
+
+Logs distinguish waiting for the generation slot, request start, response and
+timeout without recording prompts, replies or credentials. A chat generation
+timeout ends that turn instead of automatically submitting the same long
+request three times. The conversation displays a generic failure state. After
+correcting configuration, send a new message; existing failed history is retained.
+
+Password sessions are stored as digests under `data/auth/`. They are separate
+from case evidence and can be invalidated by revocation, account-policy changes
+or expiry. Keep that directory private to the service identity and back it up
+according to the deployment's authentication policy.

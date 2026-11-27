@@ -63,6 +63,18 @@ and [related events](architecture/related-events.md) for scope and field mapping
 ## Analyst credentials
 
 ```bash
+python -m cybertriage analyst-password --analyst-id local-analyst --username local-analyst
+```
+
+Run from an interactive terminal with the project Python environment active.
+The password and confirmation are hidden; no password argument is accepted.
+The command updates only the existing principal's username/password hash in
+`config/analysts.local.yaml`. Permissions and API-token hashes are retained.
+After provisioning or rotation, recreate the analyst API container to refresh
+its mounted configuration file. No password is stored in `.env`.
+
+
+```bash
 python -m cybertriage analyst-key
 ```
 

@@ -72,10 +72,13 @@ Report text, logs and source strings render as text, not executable markup.
 
 ## Authentication and transport
 
-Each analyst enters a provisioned high-entropy API token. It is held in private
+Each analyst signs in with a provisioned username/password or selects the
+existing API-token method. Password login obtains a 15-minute bearer session, held in private
 page memory, never local/session storage, browser URLs or build configuration.
 Locking, page exit and 15 minutes of inactivity clear credentials and abort
-pending requests. The API still controls expiry, revocation and authorization;
+pending requests. Password sessions also receive a best-effort server revocation
+request; a failed sign-out is visible on the locked screen, and server expiry
+remains enforced. The API still controls expiry, revocation and authorization;
 frontend permission checks only determine which controls are presented.
 
 Same-origin `/api/v1/` requests carry the bearer token through the frontend proxy.
