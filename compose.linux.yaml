@@ -1,0 +1,15 @@
+# Native Linux Docker Engine: workers reach host-local Ollama and SSH tunnels.
+# API/frontend listeners and their isolated bridge network remain unchanged.
+services:
+  worker:
+    network_mode: host
+    environment:
+      CYBERTRIAGE_OLLAMA_URL: "${CYBERTRIAGE_OLLAMA_URL:-http://127.0.0.1:11434}"
+      CYBERTRIAGE_INDEXER_FORWARD_HOST: ""
+      CYBERTRIAGE_INDEXER_FORWARD_PORT: ""
+  investigation-worker:
+    network_mode: host
+    environment:
+      CYBERTRIAGE_OLLAMA_URL: "${CYBERTRIAGE_OLLAMA_URL:-http://127.0.0.1:11434}"
+      CYBERTRIAGE_INDEXER_FORWARD_HOST: ""
+      CYBERTRIAGE_INDEXER_FORWARD_PORT: ""

@@ -50,7 +50,7 @@ def model_prerequisites(command: str):
     normalized = lambda name: name if ":" in name else name + ":latest"
     missing = {name for name in required if normalized(name) not in available}
     if missing:
-        raise ValueError("Required existing models were not found: " + ", ".join(sorted(missing)) + ". Check the read-only models mount. No model is downloaded automatically.")
+        raise ValueError("Required existing models were not found: " + ", ".join(sorted(missing)) + ". Check the configured external Ollama service. No model is downloaded automatically.")
     if command in {"worker", "investigation-worker"}:
         if not Path("data/catalogs/windows-security.json").is_file() or not Path("data/chroma/chroma.sqlite3").is_file():
             raise ValueError("Knowledge data is missing. Import the existing data or populate the catalogue/collections before starting workers.")

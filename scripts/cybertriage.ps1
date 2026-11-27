@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0, Mandatory = $true)]
-    [ValidateSet('configure', 'build', 'import-data', 'start', 'stop', 'status', 'logs')]
+    [ValidateSet('configure', 'build', 'import-data', 'knowledge', 'start', 'stop', 'status', 'logs')]
     [string]$Action,
     [switch]$Graph
 )
@@ -44,12 +44,30 @@ function Write-SecretOnce([string]$Path, [string]$Prompt, [bool]$Generate = $fal
     }
 }
 
+function Write-AnalystOnce {
+    $analystPath = Join-Path $projectRoot 'config/analysts.local.yaml'
+    if (Test-Path -LiteralPath $analystPath) { return }
+    $bytes = New-Object byte[] 32
+    $generator = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $generator.GetBytes($bytes) } finally { $generator.Dispose() }
+    $token = [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+    $hash = [Security.Cryptography.SHA256]::Create()
+    try { $digest = [BitConverter]::ToString($hash.ComputeHash([Text.Encoding]::UTF8.GetBytes($token))).Replace('-', '').ToLowerInvariant() } finally { $hash.Dispose() }
+    $expiry = [DateTime]::UtcNow.AddDays(30).ToString('yyyy-MM-ddTHH:mm:ssZ')
+    $configuration = @{schema_version=1; principals=@(@{id='local-analyst'; token_sha256=$digest;
+        permissions=@('cases:read','cases:write','cases:review','investigations:request','reports:read_all','triage:review');
+        case_ids=@('*'); expires_at=$expiry})} | ConvertTo-Json -Depth 5
+    $content = (New-Object Text.UTF8Encoding($false)).GetBytes($configuration)
+    $stream = [IO.File]::Open($analystPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    try { $stream.Write($content, 0, $content.Length) } finally { $stream.Dispose() }
+    Write-Host "New analyst token (shown once; expires $expiry):"
+    Write-Host $token
+    $token = $null
+}
+
 if ($Action -eq 'configure') {
     if (-not (Test-Path -LiteralPath $environmentPath)) {
         Copy-Item -LiteralPath (Join-Path $projectRoot '.env.docker.example') -Destination $environmentPath
-        $modelsDirectory = (Join-Path ([Environment]::GetFolderPath('UserProfile')) '.ollama/models').Replace('\', '/')
-        $environmentText = [IO.File]::ReadAllText($environmentPath).Replace('C:/Users/YOUR_USERNAME/.ollama/models', $modelsDirectory)
-        [IO.File]::WriteAllText($environmentPath, $environmentText, (New-Object Text.UTF8Encoding($false)))
     }
     $secretsDirectory = Join-Path $projectRoot 'config/secrets'
     $certsDirectory = Join-Path $projectRoot 'config/certs'
@@ -57,6 +75,7 @@ if ($Action -eq 'configure') {
     Write-SecretOnce (Join-Path $secretsDirectory 'ingestion.token') 'Existing ingestion token configured in Wazuh'
     Write-SecretOnce (Join-Path $secretsDirectory 'indexer.password') 'Read-only Indexer password'
     Write-SecretOnce (Join-Path $secretsDirectory 'neo4j.password') '' $true
+    Write-AnalystOnce
     Write-Host 'Local configuration created; existing files were retained.'
     Write-Host 'Edit .env.docker.local and copy the public Indexer CA to config/certs/indexer-ca.pem.'
     Write-Host 'Keep the configured analysts.local.yaml with its existing credential hashes.'
@@ -76,6 +95,15 @@ try {
             & docker @composeArguments run --rm --no-deps bootstrap
             if ($LASTEXITCODE -ne 0) { throw 'Bootstrap failed. No import was attempted.' }
             & docker @composeArguments --profile maintenance run --rm --no-deps import-data
+        }
+        'knowledge' {
+            & docker @composeArguments run --rm --no-deps bootstrap
+            if ($LASTEXITCODE -ne 0) { throw 'Bootstrap failed.' }
+            & docker @composeArguments run --rm --no-deps worker catalog-update
+            if ($LASTEXITCODE -ne 0) { throw 'Catalogue update failed.' }
+            & docker @composeArguments run --rm --no-deps worker ingest --source mitre
+            if ($LASTEXITCODE -ne 0) { throw 'MITRE ingestion failed.' }
+            & docker @composeArguments run --rm --no-deps worker ingest --source microsoft
         }
         'start' {
             & docker @composeArguments up --build -d --wait --wait-timeout 300

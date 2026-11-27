@@ -16,6 +16,6 @@ def ollama_base_url() -> str:
             or url.username is not None or url.password is not None or url.query or url.fragment
             or url.path not in {"", "/"}):
         raise ValueError("CYBERTRIAGE_OLLAMA_URL must be an HTTP(S) origin without credentials or paths.")
-    if url.scheme == "http" and url.hostname not in {"localhost", "127.0.0.1", "::1", "ollama"}:
-        raise ValueError("Remote Ollama origins require HTTPS; plaintext is limited to loopback and the private Compose ollama service.")
+    if url.scheme == "http" and url.hostname not in {"localhost", "127.0.0.1", "::1", "host.docker.internal"}:
+        raise ValueError("Remote Ollama origins require HTTPS; plaintext is limited to loopback and the Docker Desktop host gateway.")
     return value.rstrip("/")

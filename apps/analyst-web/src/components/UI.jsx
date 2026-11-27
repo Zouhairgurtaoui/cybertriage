@@ -20,6 +20,7 @@ export function Reference({title, url}) {
 export function Icon({name}) {
   const paths = {cases:<><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
     alerts:<><path d="M5 17h14l-2-3V9a5 5 0 0 0-10 0v5z"/><path d="M10 21h4"/></>,
+    reviews:<><path d="M6 3h9l4 4v14H5V3z"/><path d="M9 11h6m-6 4h6"/></>,
     quality:<><path d="M4 20V10m8 10V4m8 16v-7"/><path d="M2 21h20"/></>,
     lock:<><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4"/></>};
   return <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">{paths[name] || paths.cases}</svg>;

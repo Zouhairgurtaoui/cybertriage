@@ -61,8 +61,8 @@ Implemented code paths:
 - A separate analyst API with hashed expiring credentials, explicit operation/case
   permissions, authenticated audit actors, bounded request bodies and OpenAPI.
 - A separate leased queue and worker for explicit analyst-requested investigations.
-- Root Docker Compose lifecycle for frontend, APIs, workers and existing-model
-  Ollama; optional local Neo4j/schema/publication services, private API TLS,
+- Root Docker Compose lifecycle for frontend, APIs and workers with an external
+  model-service endpoint; optional local Neo4j/schema/publication services, private API TLS,
   file credentials, process health, retained named volumes and explicit import.
 - An independent React analyst application with evidence/case queues, timeline,
   reports, investigation requests, relationship/Kill Chain review, graph browsing,
@@ -191,3 +191,17 @@ The frontend lockfile is present and consumed by Docker builds. No complete
 bundle/browser or container acceptance result is recorded yet. Static checks do
 not certify visual quality, runtime integration or deployment security.
 
+
+## Agent report access and launchers
+
+The React console has a dedicated Agent review page for saved automatic and
+requested reports, with alert-coverage filtering and direct inbox links. Full
+reports retain global scope and `reports:read_all` authorization. Case reports
+use the same viewer and appear before follow-up requests.
+
+Linux and Windows launchers support explicit knowledge preparation as well as
+existing-data import. Initial configuration creates a review credential only
+when its local file is absent. Linux workers use a host-network override for
+local model and Indexer dependencies. Runtime/browser/Linux acceptance of these
+changes remains pending. Obsolete root learning helpers are excluded from the
+active application; validation tools remain available.

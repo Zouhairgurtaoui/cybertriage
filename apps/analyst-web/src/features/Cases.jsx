@@ -21,7 +21,7 @@ export function CaseList({navigate}){
     </section></>;
 }
 
-const TABS=[["overview","Overview"],["evidence","Evidence"],["timeline","Timeline"],["investigations","Investigations"],["graph","Graph"],["relationships","Relationships"],["stages","Kill Chain"],["responses","Responses"],["history","Audit history"]];
+const TABS=[["overview","Overview"],["evidence","Evidence"],["timeline","Timeline"],["investigations","Agent review"],["graph","Graph"],["relationships","Relationships"],["stages","Kill Chain"],["responses","Responses"],["history","Audit history"]];
 export function CaseWorkspace({caseId,navigate,notify}){
   const{api,can}=useSession(),dialog=useDialog(),resource=useResource(caseUrl(caseId));
   const[tab,setTab]=useState("overview"),[stale,setStale]=useState(false);

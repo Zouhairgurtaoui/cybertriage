@@ -213,6 +213,17 @@ def create_analyst_app(database: Path, credentials: Path, response_config: Path,
         global_scope(identity)
         return await run_in_threadpool(alert_reader.alert_detail, record_id)
 
+    @app.get("/api/v1/analyses")
+    async def agent_reports(limit: int = 50, before: int | None = None, alert_id: str | None = None,
+                            identity=Depends(permission("reports:read_all"))):
+        global_scope(identity)
+        return await run_in_threadpool(alert_reader.list_analyses, limit, before, alert_id)
+
+    @app.get("/api/v1/analyses/{analysis_id}")
+    async def agent_report(analysis_id: str, identity=Depends(permission("reports:read_all"))):
+        global_scope(identity)
+        return await run_in_threadpool(alert_reader.analysis_detail, analysis_id)
+
     @app.get("/api/v1/cases")
     async def list_cases(limit: int = 50, after: str | None = None, status: str | None = None, identity=Depends(permission("cases:read"))):
         from cybertriage.application.services.case_management import STATUSES, identifier, page

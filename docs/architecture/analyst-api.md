@@ -58,6 +58,7 @@ requires a dedicated entitlement model; case membership alone does not provide i
 | --- | --- |
 | `/api/v1/me`, `/api/v1/schema` | Current permissions and authenticated OpenAPI contract. |
 | `/api/v1/alerts`, `/api/v1/alerts/{record_id}` | Bounded retained-alert inbox and evidence detail; global evidence scope required. |
+| `/api/v1/analyses`, `/api/v1/analyses/{analysis_id}` | Newest-first saved reports, optional alert coverage filter and retained report detail; global scope plus `reports:read_all` required. |
 | `/api/v1/cases` | Scoped listing and explicit case creation. |
 | `/api/v1/cases/{case_id}` | Case metadata and versioned review updates. |
 | `.../alerts`, `.../notes`, `.../relationships`, `.../stages` | Existing application services with server-derived audit actors. |
@@ -117,3 +118,17 @@ syntax/import checks. Live HTTP authorization, queue regression, model behavior,
 firewall execution and deployment acceptance remain to be validated. The separate
 React interface has been implemented; its dependency installation, build and
 browser/API acceptance remain pending.
+
+## Saved agent reports
+
+The global report list includes automatic analyses and requested investigations,
+including reports not attached to cases. `alert_id` filters by report anchor or
+recorded input coverage, so a grouped member can locate its shared report.
+Legacy reports without coverage metadata can be found through their anchor.
+Pagination uses a bounded descending local SQLite sequence, separate from
+incident timestamps. Listing or opening reports performs no model or tool calls.
+
+Alert details expose a limited job projection (ID, status, attempt count and
+error code). Grouped members resolve to the representative automatic job;
+claim tokens and lease ownership are not exposed. Neither report visibility nor
+job completion changes case findings or response authorization.

@@ -1,12 +1,3 @@
-# Previous implementation and learning scripts
-/main.py
-/embeddings_demo.py
-/langchain_client.py
-/load_runbooks.py
-/semantic_retrieval.py
-/receiver.py
-/web_sources.py
-
 # Downloaded knowledge and generated application data
 /data/
 

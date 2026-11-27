@@ -4,7 +4,7 @@ The root Compose project supplies one lifecycle for independently running
 frontend, API and worker containers. Domain/application services retain their
 existing ports and adapters; deployment wiring selects container addresses,
 storage, credentials and process commands. Installation, migration and commands
-are in the [README](../../README.md#run-the-application-with-docker-compose).
+are in the [README](../../README.md#run-with-docker).
 
 ```mermaid
 flowchart LR
@@ -16,9 +16,8 @@ flowchart LR
     Automatic[Automatic worker] --> Data
     Requested[Requested-investigation worker] --> Data
     Expiry[Response-expiry worker] --> Data
-    Automatic --> Ollama[Private Ollama service]
+    Automatic --> Ollama[External model service / Ollama adapter]
     Requested --> Ollama
-    Weights[Existing model directory / read only] --> Ollama
     Automatic --> Indexer[External verified Indexer]
     Requested --> Indexer
     Projection[Optional graph worker] --> Data
@@ -30,7 +29,7 @@ flowchart LR
 Bootstrap initializes named-volume ownership and a private API certificate.
 It performs no knowledge download, model generation, response dispatch or
 credential provisioning. API health gates the frontend/requested worker/expiry
-worker; ingestion health and Ollama availability gate automatic analysis.
+worker; ingestion health gates automatic analysis. The model runtime is external.
 Worker startup verifies existing model tags, knowledge files and Indexer
 configuration before claiming work. Missing prerequisites fail visibly.
 
@@ -81,12 +80,18 @@ the API and expiry worker through ignored `config/firewall.local.env`, or a
 deployment override with Docker secrets and the `_FILE` convention. Firewall CA
 paths in target configuration must refer to explicitly mounted container paths.
 
-Ollama is an unexposed service on the single-host Compose bridge. Its existing
-weights are mounted read-only, pruning is disabled and startup performs no
-`pull` operation. The backend URL is environment-selected, while the native
-localhost default and embedding model remain unchanged. Remote Ollama origins
-require HTTPS; the plaintext service name is limited to the private `ollama`
-deployment binding.
+The model runtime has an independent lifecycle. Compose contains no Ollama
+server, model-image dependency, weight mount or model-data volume. The current
+Ollama adapters use an environment-selected URL; the native localhost default
+and embedding model remain unchanged. Docker Desktop workers reach a host
+service through `host.docker.internal`. HTTP is limited to loopback and this
+trusted local development gateway; remote origins require verified HTTPS.
+
+Application services depend on the `TriageModel` and `InvestigationModel` ports;
+the composition root currently binds Ollama implementations. A provider API
+requires its own adapter and startup/credential configuration. It is not enabled
+merely by substituting a different URL. Chat and embedding adapters remain
+independent, allowing a hosted chat model with the existing local embeddings.
 
 The optional graph processes share Neo4j's network namespace and connect to its
 loopback-only Bolt listener. Neo4j publishes no host port and its HTTP endpoints
@@ -114,8 +119,8 @@ inspection of partial volume contents before retry. Host source data is retained
 
 Backups must include the authoritative volume and configuration. Ordinary
 `down` retains volumes; removing volumes discards retained evidence and local
-database state. CPU-only Ollama execution and its one-request parallelism limit
-suit the initial laptop deployment, but throughput still needs measurement.
+database state. Model concurrency/resource limits belong to the external
+runtime's configuration and still require workload measurement.
 
 ## Acceptance
 
@@ -125,3 +130,34 @@ credential scopes, external Indexer/VM transport, shutdown during work, Neo4j
 publication and real firewall expiry have not yet been validated in this layout.
 Release preparation also requires dependency/image locking and deployment-specific
 ingress, backup, recovery and secret-management verification.
+
+## Linux launcher
+
+`scripts/cybertriage.sh` supplies the same configure/build/knowledge/import/start/
+stop/status/logs lifecycle as the Windows PowerShell launcher. It passes the
+explicit environment file to Compose without evaluating it as shell code.
+Configure preserves existing files; a fresh installation receives a distinct
+30-day analyst credential with investigation/review permissions and no response
+permissions. Only its hash is saved. Subsequent runs do not print an existing token.
+
+The Linux launcher merges `compose.linux.yaml`. The automatic and requested
+investigation workers use native Docker Engine host networking to reach
+host-local Ollama and an existing loopback SSH Indexer tunnel. They expose no
+listening application port, but share the host network namespace rather than
+bridge isolation. Other services keep their original network boundaries. Remote
+model/Indexer endpoints still require the configured verified transport.
+The Windows launcher uses the base Compose file and its existing relay instead.
+
+Linux secret files are individually mounted by Compose. Their host directory
+is private (0700), while the mounted files are readable (0644) by the unprivileged
+container accounts. This allows file-backed Compose secrets to work without
+assuming UID/mode remapping. Host users cannot traverse the private directory;
+Docker administrators retain access. See [Docker's secret handling](https://docs.docker.com/compose/how-tos/use-secrets/).
+For managed deployments, use the deployment's secret manager and mount policy.
+
+`knowledge` explicitly prepares the catalogue and configured Chroma collections
+inside the volume. It runs only on request with backend processes stopped.
+`import-data` remains the alternative for migration into an empty destination.
+Neither launcher removes volumes on stop. Linux runtime acceptance remains
+pending; Compose configuration validation does not establish it. Shell syntax
+execution was unavailable in the Windows environment.

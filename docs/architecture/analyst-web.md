@@ -17,7 +17,7 @@ flowchart LR
 This deployment boundary allows independent frontend releases. It does not
 change the backend's single-host SQLite storage assumptions. Installation,
 credential provisioning, local commands and container configuration are in the
-[README](../../README.md#react-analyst-application).
+[README](../../README.md#find-the-agents-review).
 
 ## Component boundaries
 
@@ -37,6 +37,14 @@ or firewall integrations. Small hooks separate asynchronous request lifecycle
 from presentation; the backend remains the source of workflow authority.
 
 ## Analyst workflow
+
+The sidebar's **Agent review** page lists saved reports across the retained
+analysis database. It opens the newest report inline and supports alert-specific
+navigation from the inbox. No case attachment is needed. The case's **Agent
+review** tab lists linked reports before follow-up requests. The shared viewer
+shows analysis, references, tool evidence and recorded input coverage; missing
+reports and restricted access have explicit states. See the [analyst guide](../analyst-guide.md).
+
 
 The case queue shows loaded-case counts, not invented organization-wide totals.
 The alert inbox retains source IDs separately from local record IDs. Cases expose

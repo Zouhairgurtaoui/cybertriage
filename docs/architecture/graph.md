@@ -127,7 +127,7 @@ subsequent case revision; conflicting content is never force-overwritten.
 
 ## Configuration and access boundary
 
-Installation and commands are in the [README](../../README.md#case-graphs).
+Installation and commands are in the [README](../cli.md#case-graphs).
 The official driver is optional and imported only by online graph commands.
 Remote connections require certificate-verified `neo4j+s` or `bolt+s`.
 Plain `bolt` is accepted only for direct loopback connections; self-signed
