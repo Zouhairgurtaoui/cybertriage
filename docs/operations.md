@@ -27,6 +27,7 @@ not install models, grant firewall privileges or enable execution themselves.
 | `serve-analyst` | Separately authenticated case, graph, investigation and response API. |
 | `analyst-web` | Separate React frontend, served by Vite for local development or Nginx in deployment; proxies API requests. |
 | `investigation-worker` | Explicit analyst-requested investigations. |
+| `case-chat-worker` | Persistent case conversations, RAG review and scoped read-only follow-ups. |
 | `response-expiry-worker` | Due IP-block removals; keep running while leases exist. |
 | `graph-worker` | Optional changed-case publication to Neo4j. |
 

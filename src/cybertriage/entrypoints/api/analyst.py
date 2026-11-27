@@ -109,6 +109,14 @@ class Investigation(Body):
     idempotency_key: str
 
 
+class ChatMessage(Body):
+    content: str = Field(min_length=1, max_length=2000)
+    expected_version: int = Field(ge=1)
+    idempotency_key: str
+    mode: Literal["review", "investigate"] = "review"
+    anchor_alert_id: str | None = None
+
+
 class Feedback(Body):
     label: Literal["benign", "malicious", "uncertain"]
     reason: str
@@ -119,6 +127,8 @@ def create_analyst_app(database: Path, credentials: Path, response_config: Path,
     keys.load()  # Fail closed on absent/invalid credentials before opening a listener.
     cases, stages = build_case_management(database), build_case_stages(database)
     requests = SqliteInvestigationRequests(database)
+    from cybertriage.bootstrap import build_case_conversation
+    conversation, conversation_reader = build_case_conversation(database)
     candidate_reader = SqliteCaseCandidates(database)
     alert_reader: AnalystAlertReader = SqliteAnalystAlertReader(database)
     build_response_runtime(database, response_config, firewalls_config)
@@ -338,6 +348,26 @@ def create_analyst_app(database: Path, credentials: Path, response_config: Path,
         return asdict(await run_in_threadpool(stages.review, case_id, assertion_id, data.decision,
             data.expected_version, identity.analyst_id, data.reason))
 
+    @app.get("/api/v1/cases/{case_id}/conversation")
+    async def case_conversation(case_id: str, limit: int = 20, before: int | None = None,
+                                identity=Depends(permission("reports:read_all"))):
+        global_scope(identity)
+        return await run_in_threadpool(conversation_reader.list_turns, case_id, limit, before)
+
+    @app.get("/api/v1/cases/{case_id}/conversation/{turn_id}")
+    async def conversation_turn(case_id: str, turn_id: str, identity=Depends(permission("reports:read_all"))):
+        global_scope(identity)
+        return await run_in_threadpool(conversation_reader.turn_detail, case_id, turn_id)
+
+    @app.post("/api/v1/cases/{case_id}/conversation", status_code=202)
+    async def send_case_message(case_id: str, request: Request, identity=Depends(permission("investigations:request"))):
+        global_scope(identity)
+        if not identity.permits("reports:read_all", case_id) or not identity.permits("cases:read", case_id):
+            raise HTTPException(403, "Case conversation requires case and full-report read permissions.")
+        data = await body(request, ChatMessage)
+        return await run_in_threadpool(conversation.send, case_id, data.content, identity.analyst_id,
+            data.expected_version, data.idempotency_key, data.mode, data.anchor_alert_id)
+
     @app.post("/api/v1/cases/{case_id}/investigation-requests", status_code=202)
     async def investigate(case_id: str, request: Request, identity=Depends(permission("investigations:request"))):
         global_scope(identity)
@@ -437,6 +467,7 @@ def create_analyst_app(database: Path, credentials: Path, response_config: Path,
         ("post", "/api/v1/cases/{case_id}/stages"): Stage,
         ("post", "/api/v1/cases/{case_id}/stages/{assertion_id}/reviews"): ReviewRelation,
         ("post", "/api/v1/cases/{case_id}/investigation-requests"): Investigation,
+        ("post", "/api/v1/cases/{case_id}/conversation"): ChatMessage,
         ("post", "/api/v1/cases/{case_id}/alerts/{alert_id}/feedback"): Feedback,
         ("post", "/api/v1/cases/{case_id}/responses"): Proposal,
         ("post", "/api/v1/cases/{case_id}/responses/{proposal_id}/reviews"): ReviewProposal,

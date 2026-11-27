@@ -136,6 +136,7 @@ def build_analyze_alert(
     investigate: bool = False,
     offline_knowledge: bool = False,
     password_supplier: Callable[[], str] | None = None,
+    conversation: bool = False,
 ) -> AnalyzeAlert:
     retriever = build_knowledge_retriever(database_directory, sources_config_path, configuration, offline_knowledge=offline_knowledge)
 
@@ -184,6 +185,7 @@ def build_analyze_alert(
             model=ollama,
             tools=tools_for_scope(None),
             scoped_tool_factory=tools_for_scope,
+            conversation=conversation,
         )
 
     return AnalyzeAlert(
@@ -552,3 +554,25 @@ def build_case_graph_projection(database_path: Path, sink, namespace: str = "cyb
 
     return ProjectCaseGraph(build_case_graph_export(database_path, namespace), SqliteCaseGraphReader(database_path), sink)
 
+
+
+def build_case_conversation(database_path: Path):
+    from cybertriage.adapters.storage.case_chat_sqlite import SqliteCaseChat
+    from cybertriage.application.services.case_chat import CaseConversation
+    store = SqliteCaseChat(database_path)
+    return CaseConversation(store), store
+
+
+def build_case_chat_worker(database_path: Path, database_directory: Path, catalog_path: Path,
+                           sources_config_path: Path = DEFAULT_SOURCES_CONFIG,
+                           *, model_name: str | None = None, offline_knowledge: bool = False):
+    from cybertriage.adapters.storage.case_chat_sqlite import SqliteCaseChat
+    from cybertriage.adapters.storage.alerts_sqlite import SqliteAlertRepository
+    from cybertriage.application.services.case_chat import ProcessCaseChat
+    from cybertriage.application.services.case_chat_worker import CaseChatWorker
+    queue = SqliteCaseChat(database_path)
+    processor = ProcessCaseChat(queue, SqliteAlertRepository(database_path),
+        build_analyze_alert(database_directory, catalog_path, model_name, sources_config_path,
+                            investigate=True, conversation=True, offline_knowledge=offline_knowledge),
+        build_authentication_grounder())
+    return CaseChatWorker(queue, processor)

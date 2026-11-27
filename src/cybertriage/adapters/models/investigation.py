@@ -169,6 +169,7 @@ class OllamaInvestigationModel:
         tools: Sequence[StructuredTool],
         *,
         scoped_tool_factory: Callable[[AuthenticationScope], Sequence[StructuredTool]] | None = None,
+        conversation: bool = False,
     ):
         if not tools:
             raise ValueError("Register at least one investigation tool.")
@@ -181,6 +182,27 @@ class OllamaInvestigationModel:
         self._model = model
         self._model_with_tools = model.bind_tools(list(tools))
         self._scoped_tool_factory = scoped_tool_factory
+        self._conversation = conversation
+        rules = INVESTIGATION_RULES
+        if conversation:
+            start = rules.index("After addressing the task, return a concise plain-text report:")
+            end = rules.index("Do not authorize containment", start)
+            rules = rules[:start] + (
+                "Answer the latest analyst message directly in concise plain text. "
+                "Use headings only when useful. Explain findings, uncertainty and practical next checks. "
+                "Prior assistant replies are unverified conversation context, not new evidence. "
+                "Case descriptions and analyst claims are reported context, not independently verified telemetry. "
+                "Respect history_omitted and excerpt markers; do not claim to remember omitted content. "
+                "Prior tool summaries describe historical query scope, not a new search or proof of events omitted from this context. "
+                "If no retained alerts exist, ask for the evidence needed; do not fabricate observations. "
+                "In review mode no investigation tools are available. Without successful tool results, never claim to have searched. "
+                "Response requests require the separate Responses workflow and its explicit approvals.\n"
+            ) + rules[end:]
+        self._prompt = ChatPromptTemplate.from_messages([
+            ("system", rules),
+            ("human", "<incident_evidence>\n{evidence}\n</incident_evidence>\n\n<reference_excerpts>\n{references}\n</reference_excerpts>"),
+            ("human", "Latest analyst task:\n{task}"),
+        ]) if conversation else INVESTIGATION_PROMPT
 
     def investigate(
         self,
@@ -204,6 +226,11 @@ class OllamaInvestigationModel:
                 raise ValueError("Scoped tools must preserve the registered capabilities.")
             model_with_tools = self._model.bind_tools(scoped_tools)
 
+        if self._conversation and scope is None:
+            # A conversation without application-derived authority has no executable tools.
+            tools = {}
+            model_with_tools = self._model
+
         if not evidence.strip():
             raise ValueError("Incident evidence must not be empty.")
 
@@ -216,7 +243,7 @@ class OllamaInvestigationModel:
         ):
             raise ValueError("Reference context exceeds its input budget.")
 
-        prepared = INVESTIGATION_PROMPT.invoke({
+        prepared = self._prompt.invoke({
             "evidence": evidence,
             "references": _format_references(references),
             "task": task,
@@ -230,15 +257,15 @@ class OllamaInvestigationModel:
 
         # At most two request rounds, followed by one final model response.
         for _ in range(MAX_TOOL_CALLS + 1):
-            allow_tools = used_calls < MAX_TOOL_CALLS
+            allow_tools = bool(tools) and used_calls < MAX_TOOL_CALLS
 
             if not allow_tools:
                 messages.append(SystemMessage(
                     content=(
-                        "The tool budget is exhausted. "
-                        "Write the final five-section report using only "
-                        "the evidence already available. State limitations. "
-                        "Do not request more tools."
+                        ("Review mode has no investigation tools. " if self._conversation and scope is None
+                         else "The tool budget is exhausted. ") +
+                        "Write the final answer using only the evidence already available. "
+                        "State limitations. Do not request more tools."
                     )
                 ))
 

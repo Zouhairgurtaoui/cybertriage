@@ -140,8 +140,8 @@ Configure preserves existing files; a fresh installation receives a distinct
 30-day analyst credential with investigation/review permissions and no response
 permissions. Only its hash is saved. Subsequent runs do not print an existing token.
 
-The Linux launcher merges `compose.linux.yaml`. The automatic and requested
-investigation workers use native Docker Engine host networking to reach
+The Linux launcher merges `compose.linux.yaml`. The automatic, requested-investigation and case-chat
+workers use native Docker Engine host networking to reach
 host-local Ollama and an existing loopback SSH Indexer tunnel. They expose no
 listening application port, but share the host network namespace rather than
 bridge isolation. Other services keep their original network boundaries. Remote
@@ -161,3 +161,13 @@ inside the volume. It runs only on request with backend processes stopped.
 Neither launcher removes volumes on stop. Linux runtime acceptance remains
 pending; Compose configuration validation does not establish it. Shell syntax
 execution was unavailable in the Windows environment.
+
+## Conversation worker
+
+`case-chat-worker` is an independent supervised service sharing the existing
+application-data volume. It uses the same external model, knowledge corpus,
+read-only Indexer configuration and transport relay. Startup verifies model and
+knowledge prerequisites. Indexer readiness is checked by the actual tool request,
+so an unavailable VM does not prevent tool-free case discussion. Review mode
+exposes no tools. Investigate mode retains the existing application-derived
+scope and source-failure semantics.

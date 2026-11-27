@@ -4,6 +4,7 @@ import {useAlive,usePaged,useResource,useVersion} from "../hooks/useData.js";
 import {useDialog,reasonField,supportField} from "../components/ActionDialog.jsx";
 import {Alert,Badge,DataList,Details,Empty,ErrorState,Loading,PageFooter,SectionHeading,Table} from "../components/UI.jsx";
 import {caseUrl,ids,key,query,short,stamp,STAGES,words} from "../lib/format.js";
+import {CaseChat} from "./CaseChat.jsx";
 import {Investigations} from "./Investigations.jsx";
 import {Responses} from "./Responses.jsx";
 import {EvidenceGraph} from "./Graph.jsx";
@@ -21,19 +22,19 @@ export function CaseList({navigate}){
     </section></>;
 }
 
-const TABS=[["overview","Overview"],["evidence","Evidence"],["timeline","Timeline"],["investigations","Agent review"],["graph","Graph"],["relationships","Relationships"],["stages","Kill Chain"],["responses","Responses"],["history","Audit history"]];
-export function CaseWorkspace({caseId,navigate,notify}){
+const TABS=[["chat","Conversation"],["overview","Overview"],["evidence","Evidence"],["timeline","Timeline"],["investigations","Saved reports"],["graph","Graph"],["relationships","Relationships"],["stages","Kill Chain"],["responses","Responses"],["history","Audit history"]];
+export function CaseWorkspace({caseId,navigate,notify,initialTab="chat"}){
   const{api,can}=useSession(),dialog=useDialog(),resource=useResource(caseUrl(caseId));
-  const[tab,setTab]=useState("overview"),[stale,setStale]=useState(false);
+  const[tab,setTab]=useState(initialTab),[stale,setStale]=useState(false);
   const markStale=useCallback(()=>{setStale(true);notify("The case changed after it was loaded. Refresh before making another decision.");},[notify]);
   const refresh=useCallback(()=>{setStale(false);resource.reload();},[resource.reload]);
-  if(resource.loading)return <Loading/>;
+  if(resource.loading&&!resource.data)return <Loading/>;
   if(resource.error)return <ErrorState error={resource.error} retry={refresh}/>;
-  const incident=resource.data,ctx={incident,caseId,api,refresh,stale,markStale,notify,editable:!stale&&!["closed","resolved"].includes(incident.status)};
+  const incident=resource.data,ctx={incident,caseId,api,refresh,stale,markStale,notify,openSection:setTab,editable:!resource.loading&&!stale&&!["closed","resolved"].includes(incident.status)};
   function review(){const version=incident.version;dialog.form({title:"Review case finding",description:`Record an analyst finding based on case version ${version}. This does not authorize a response.`,fields:[{name:"status",label:"Case status",type:"select",value:incident.status,options:["open","investigating","resolved","closed"]},{name:"priority",label:"Priority",type:"select",value:incident.priority,options:["low","medium","high","critical"]},{name:"disposition",label:"Finding",type:"select",value:incident.disposition,options:["unconfirmed","benign","confirmed_compromise"]},{...supportField(),required:false,hint:"Confirmed compromise requires supporting active attached alerts. Model text alone is not confirmation."},reasonField()],submit:values=>api.request(caseUrl(caseId),{method:"PATCH",body:{expected_version:version,changes:{status:values.status,priority:values.priority,disposition:values.disposition},supporting_alert_ids:ids(values.support),reason:values.reason}}),submitLabel:"Record analyst finding",after:refresh});}
-  const sections={overview:Overview,evidence:Evidence,timeline:Timeline,investigations:Investigations,graph:EvidenceGraph,relationships:Relationships,stages:StageAssessments,responses:Responses,history:History};
+  const sections={chat:CaseChat,overview:Overview,evidence:Evidence,timeline:Timeline,investigations:Investigations,graph:EvidenceGraph,relationships:Relationships,stages:StageAssessments,responses:Responses,history:History};
   const Section=sections[tab];
-  return <><SectionHeading title={incident.title} subtitle={<span className="mono">{caseId}</span>} actions={<><button className="button" onClick={()=>navigate({view:"cases"})}>All cases</button><button className="button" onClick={refresh}>Refresh case</button>{can("cases:review")&&<button className="button primary" onClick={review} disabled={stale}>Review case</button>}</>}/><div className="case-meta"><Badge value={incident.priority}/><Badge value={incident.status}/><Badge value={incident.disposition}/><span>Version {incident.version}</span><span>Updated {stamp(incident.updated_at)}</span></div>
+  return <><SectionHeading title={incident.title} subtitle={<span className="mono">{caseId}</span>} actions={<><button className="button" onClick={()=>navigate({view:"cases"})}>All cases</button><button className="button" onClick={refresh}>Refresh case</button>{can("cases:review")&&<button className="button primary" onClick={review} disabled={stale}>Record finding</button>}</>}/><div className="case-meta"><Badge value={incident.priority}/><Badge value={incident.status}/><Badge value={incident.disposition}/><span>Version {incident.version}</span><span>Updated {stamp(incident.updated_at)}</span></div>
     {stale&&<Alert>Refresh the case to obtain current version-bound controls.</Alert>}<nav className="tabs" aria-label="Case sections">{TABS.map(([value,title])=><button key={value} className={`tab ${tab===value?"active":""}`} aria-current={tab===value?"page":undefined} onClick={()=>setTab(value)}>{title}</button>)}</nav><Section key={tab} context={ctx}/></>;
 }
 function Overview({context:ctx}){

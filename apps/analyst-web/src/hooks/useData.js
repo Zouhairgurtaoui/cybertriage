@@ -9,17 +9,19 @@ export function useVersion(resource,context){useEffect(()=>{if(resource.error?.s
 export function useResource(path) {
   const {api} = useSession();
   const [nonce, setNonce] = useState(0), [state, setState] = useState({data:null, error:null, loading:true});
+  const lastPath=useRef(null);
   useEffect(() => {
     if (!path) { setState({data:null,error:null,loading:false}); return; }
     const controller = new AbortController(); let active = true;
-    setState({data:null,error:null,loading:true});
+    const samePath=lastPath.current===path;lastPath.current=path;
+    setState(old=>({data:samePath?old.data:null,error:null,loading:true}));
     api.request(path, {signal: controller.signal}).then(data => { if (active) setState({data,error:null,loading:false}); }, error => { if (active && error.name !== "AbortError") setState({data:null,error,loading:false}); });
     return () => { active = false; controller.abort(); };
   }, [api, path, nonce]);
   return {...state, reload: useCallback(() => setNonce(value => value + 1), [])};
 }
 
-export function usePaged(path, key, {next="next_after", parameter="after", maximum=500} = {}) {
+export function usePaged(path, key, {next="next_after", parameter="after", maximum=500, pageSize=50} = {}) {
   const {api} = useSession();
   const [nonce, setNonce] = useState(0), [state, setState] = useState({rows:[],cursor:null,loading:true,error:null,version:null});
   const generation = useRef(0), busy = useRef(false), controller = useRef(null), current = useRef(state);
@@ -29,7 +31,7 @@ export function usePaged(path, key, {next="next_after", parameter="after", maxim
     busy.current = true; const request = new AbortController(); controller.current = request;
     setState(old => ({...old,loading:true,error:null}));
     try {
-      const data = await api.request(`${path}${path.includes("?") ? "&" : "?"}${query({limit:50,[parameter]:cursor})}`, {signal:request.signal});
+      const data = await api.request(`${path}${path.includes("?") ? "&" : "?"}${query({limit:pageSize,[parameter]:cursor})}`, {signal:request.signal});
       if (own !== generation.current) return;
       if (!Array.isArray(data[key])) throw new ApiError("The server returned an invalid list response. Refresh saved state.",502);
       const previous = current.current;
@@ -37,7 +39,7 @@ export function usePaged(path, key, {next="next_after", parameter="after", maxim
       setState({rows:append ? [...previous.rows,...data[key]] : data[key], cursor:data[next],loading:false,error:null,version:data.case_version ?? null});
     } catch (error) { if (own === generation.current && error.name !== "AbortError") setState(old => ({...old,loading:false,error})); }
     finally { if (own === generation.current) busy.current = false; }
-  }, [api,path,key,next,parameter]);
+  }, [api,path,key,next,parameter,pageSize]);
   useEffect(() => {
     generation.current += 1; busy.current = false; const own = generation.current;
     setState({rows:[],cursor:null,loading:Boolean(path),error:null,version:null});

@@ -1,20 +1,57 @@
 # Analyst guide
 
+## Case conversations
+
+Open a case to enter its Conversation tab. The sidebar lists recent entries
+from the loaded authorized case page; Browse all cases opens the full paginated
+case queue. The + button creates a case and opens its conversation.
+
+Describe the incident or select Prepare a case review, then send the message.
+The message is retained immediately and a chat worker generates the reply.
+Questions and replies share the thread. Leaving the page does not cancel queued
+work, and reloading restores the saved conversation.
+
+Discuss / review mode does not run investigation tools. It can discuss reported
+context even before any Wazuh alerts are attached. Attach retained alerts from
+Evidence to ground the discussion in telemetry. Investigate mode enables the
+existing read-only tools within a scope derived from the selected attached
+alert's structured identity, host and time. Free-text requests cannot enlarge
+that authority or execute firewall commands.
+
+With no explicit focus, at most five active attached alerts become input. Cases
+with more alerts require a selected focus. Evidence and sources on each reply
+shows its input, references and tool observations. Earlier saved reports are
+unverified background context, not proof of the current incident.
+
+Conversation storage retains the whole thread up to its 1,000-turn limit. Each
+model request receives a bounded snapshot: up to eight recent turns, excerpts
+of earlier answers, historical query summaries and up to two linked report excerpts. History that does not
+fit the context budget is omitted with a visible indicator. The model does not
+receive unlimited memory. Full selected alert evidence must fit the input
+budget; excessive context produces an explicit failure instead of a partial
+accepted reply.
+
+One turn can be pending/running per case. Submission keys make retries
+idempotent. The worker uses renewable leases and at most three attempts; a stale
+worker cannot save a reply. A failed turn remains in history and can be followed
+by a new message after the cause is resolved. Responses opens the separate
+proposal/approval workflow. Chat never grants response authority.
+
 ## Read the agent's report
 
-Open **Agent review** in the sidebar. It lists saved automatic analyses and
+Open **Saved reports** in the sidebar. It lists saved automatic analyses and
 requested investigations, whether or not their alerts belong to a case.
 The first report in the newest-first list opens below it. Select a report to
 read its analysis, references, tool results and exact stored input evidence.
 Refresh retrieves saved state; it does not request model generation.
 
-**Alert inbox → Agent review** filters the list to reports whose anchor or
+**Alert inbox → Saved reports** filters the list to reports whose anchor or
 recorded coverage includes that alert. Grouped alerts share an automatic job;
 their distinct evidence remains retained. Old reports without coverage metadata
 are identifiable by their anchor only. A zero coverage count does not establish
 that every alert in a case was analyzed.
 
-The **Agent review** tab inside a case lists reports covering attached evidence.
+The **Saved reports** tab inside a case lists reports covering attached evidence.
 Saved reports appear before follow-up requests. Selecting a report opens its
 stored analysis and evidence. Neither attaching an alert nor opening a case
 automatically starts an investigation.

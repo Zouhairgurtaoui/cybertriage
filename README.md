@@ -19,7 +19,7 @@ flowchart LR
     A --> R[Saved report and evidence]
     R --> U[React analyst console]
     U -->|Investigate further| Q
-    U --> C[Case review]
+    U --> C[Case conversation and review]
     C --> P[Proposal, approval and dispatch]
 ```
 
@@ -28,7 +28,7 @@ flowchart LR
 | Alerts | Authenticated Wazuh ingestion, deduplication, bounded grouping and auditable suppression. |
 | Investigation | Persistent workers, retries, crash recovery and bounded read-only searches. |
 | Knowledge | Chroma retrieval, event catalogue and cached public-document lookups from allowlisted sources. |
-| Analyst console | Agent reports, retained alerts, cases, timelines, feedback and investigation requests. |
+| Analyst console | Persistent case conversations, agent reports, retained alerts, timelines and analyst feedback. |
 | Graphs | Evidence relationships and reviewed Cyber Kill Chain assessments; optional Neo4j projection. |
 | Responses | Separate proposal, approval and execution workflow with an OPNsense adapter. |
 
@@ -79,7 +79,7 @@ expiry and credential rotation.
 For a loopback-only Indexer reached through an SSH tunnel:
 
 - **Linux:** keep the host tunnel open and set the Indexer URL to its verified
-  loopback endpoint. The Linux launcher uses host networking for the two model
+  loopback endpoint. The Linux launcher uses host networking for the model
   workers so they can reach local Ollama and the tunnel.
 - **Windows:** set the verified loopback URL and enable
   `CYBERTRIAGE_INDEXER_FORWARD_HOST=host.docker.internal` plus the matching
@@ -133,29 +133,37 @@ The analyst API is private behind the frontend's verified HTTPS proxy. Bindings
 above are local-only; remote browser access needs an HTTPS ingress. Named volumes
 retain evidence across restarts. Back them up before upgrades or migration.
 
-## Find the agent's review
+## Work with the agent
 
-Select **Agent review** in the sidebar to read saved reports, including automatic
-analyses that are not attached to a case. The newest report opens directly below
-the list. Select another row to read its analysis, references and tool evidence.
+Open a case to start its **Conversation**, or use **+** beside **Case conversations**
+in the sidebar to create one. Describe the incident and send a message. The agent's
+reply appears in the same thread; follow-up questions reuse bounded case and
+conversation context. Existing cases remain available in the sidebar.
 
-From **Alert inbox**, choose **Agent review** beside an alert to see only reports
-covering it. Inside a case, use the **Agent review** tab for linked reports and
-follow-up investigation requests.
+**Discuss / review** uses the supplied case context and references. Attach Wazuh
+alerts through **Evidence**, then choose **Investigate with read-only tools** to
+allow scoped searches. Select an evidence focus when the case has many alerts.
+No VM evidence is invented for a case described only in chat.
 
 ```mermaid
 flowchart LR
-    I[Alert inbox] --> R[Agent review]
-    R --> E[Read report, references and tool evidence]
-    E --> C[Attach evidence to a case]
-    C --> F[Investigate further]
-    F --> N[New retained report]
+    C[Case conversation] --> Q[Saved message and queued turn]
+    Q --> W[Chat worker with RAG]
+    W --> R[Reply, references and evidence]
+    R --> C
+    C -->|Explicit scoped request| T[Read-only investigation tools]
+    C -->|Separate workflow| A[Responses and approval]
 ```
 
-An accepted alert can still have a pending or failed analysis job. Suppressed
-alerts are retained without automatic jobs. Viewing an alert never generates a
-report. [The analyst guide](docs/analyst-guide.md) explains these states and access
-requirements.
+Replies are processed by `case-chat-worker` and remain available after leaving
+or reloading the page. **Evidence and sources** opens the provenance for each
+reply. Chat requests never execute or approve a response; **Responses** opens
+that separate workflow.
+
+The sidebar's **Saved reports** page remains a saved-report browser. It includes
+automatic analyses and alert-backed chat reports. Case-only conversations are
+retained in their case thread rather than assigned a fabricated Wazuh alert.
+See the [analyst guide](docs/analyst-guide.md) for access, job states and context limits.
 
 ## Develop locally
 

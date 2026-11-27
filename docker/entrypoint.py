@@ -51,7 +51,7 @@ def model_prerequisites(command: str):
     missing = {name for name in required if normalized(name) not in available}
     if missing:
         raise ValueError("Required existing models were not found: " + ", ".join(sorted(missing)) + ". Check the configured external Ollama service. No model is downloaded automatically.")
-    if command in {"worker", "investigation-worker"}:
+    if command in {"worker", "investigation-worker", "case-chat-worker"}:
         if not Path("data/catalogs/windows-security.json").is_file() or not Path("data/chroma/chroma.sqlite3").is_file():
             raise ValueError("Knowledge data is missing. Import the existing data or populate the catalogue/collections before starting workers.")
         from cybertriage.adapters.configuration.indexer_environment import EnvironmentIndexerConfiguration
@@ -83,12 +83,13 @@ def main() -> int:
             fcntl.flock(lock.fileno(), (fcntl.LOCK_EX if maintenance else fcntl.LOCK_SH) | fcntl.LOCK_NB)
         except BlockingIOError as error:
             raise ValueError("A maintenance task or running service owns the data volume. Stop backend services before import or ingestion.") from error
-        if command in {"worker", "investigation-worker", "ingest"}:
+        if command in {"worker", "investigation-worker", "case-chat-worker", "ingest"}:
             model_prerequisites(command)
-        if command in {"worker", "investigation-worker"}:
+        if command in {"worker", "investigation-worker", "case-chat-worker"}:
             from indexer_forward import configured_indexer_forward
             resources.enter_context(configured_indexer_forward())
-            verify_indexer_connection()
+            if command != "case-chat-worker":
+                verify_indexer_connection()
         child = subprocess.Popen([sys.executable, "-m", "cybertriage", *arguments], stdin=subprocess.DEVNULL)
         stopping = False
         deadline = None

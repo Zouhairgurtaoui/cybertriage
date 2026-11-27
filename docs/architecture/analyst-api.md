@@ -59,6 +59,7 @@ requires a dedicated entitlement model; case membership alone does not provide i
 | `/api/v1/me`, `/api/v1/schema` | Current permissions and authenticated OpenAPI contract. |
 | `/api/v1/alerts`, `/api/v1/alerts/{record_id}` | Bounded retained-alert inbox and evidence detail; global evidence scope required. |
 | `/api/v1/analyses`, `/api/v1/analyses/{analysis_id}` | Newest-first saved reports, optional alert coverage filter and retained report detail; global scope plus `reports:read_all` required. |
+| `/api/v1/cases/{case_id}/conversation`, `/conversation/{turn_id}` | Persistent case turns, bounded history and reply provenance. Reads require global report access; sending also requires investigation-request and case-read permissions. |
 | `/api/v1/cases` | Scoped listing and explicit case creation. |
 | `/api/v1/cases/{case_id}` | Case metadata and versioned review updates. |
 | `.../alerts`, `.../notes`, `.../relationships`, `.../stages` | Existing application services with server-derived audit actors. |

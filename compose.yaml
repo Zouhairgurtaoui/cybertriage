@@ -148,6 +148,29 @@ services:
       retries: 3
       start_period: 30s
 
+  case-chat-worker:
+    <<: *backend
+    command: [case-chat-worker]
+    environment: *model-environment
+    secrets: [indexer_password]
+    volumes:
+      - application-data:/app/data
+      - type: bind
+        source: "${CYBERTRIAGE_INDEXER_CA_PATH:?Set the public Indexer CA file}"
+        target: /run/indexer-ca.pem
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      analyst-api:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python, /app/docker/healthcheck.py, worker]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
   response-expiry-worker:
     <<: *backend
     env_file:

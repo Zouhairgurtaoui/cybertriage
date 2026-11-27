@@ -194,7 +194,7 @@ not certify visual quality, runtime integration or deployment security.
 
 ## Agent report access and launchers
 
-The React console has a dedicated Agent review page for saved automatic and
+The React console has a dedicated Saved reports page for saved automatic and
 requested reports, with alert-coverage filtering and direct inbox links. Full
 reports retain global scope and `reports:read_all` authorization. Case reports
 use the same viewer and appear before follow-up requests.
@@ -205,3 +205,13 @@ when its local file is absent. Linux workers use a host-network override for
 local model and Indexer dependencies. Runtime/browser/Linux acceptance of these
 changes remains pending. Obsolete root learning helpers are excluded from the
 active application; validation tools remain available.
+
+## Persistent case conversations
+
+Case chat adds retained analyst messages, frozen case/history context and
+provisional replies with provenance. A separate leased worker supports bounded
+retries and rejects stale completions. Alert-backed replies join saved analysis
+coverage; case-only replies stay in the conversation without fabricated alerts.
+Review mode disables tools. Investigation mode uses existing derived query
+scopes. The React thread, sidebar history and source viewer are implemented;
+functional concurrency, browser and live-model acceptance remains pending.

@@ -17,7 +17,7 @@ flowchart LR
 This deployment boundary allows independent frontend releases. It does not
 change the backend's single-host SQLite storage assumptions. Installation,
 credential provisioning, local commands and container configuration are in the
-[README](../../README.md#find-the-agents-review).
+[README](../../README.md#work-with-the-agent).
 
 ## Component boundaries
 
@@ -38,7 +38,7 @@ from presentation; the backend remains the source of workflow authority.
 
 ## Analyst workflow
 
-The sidebar's **Agent review** page lists saved reports across the retained
+The sidebar's **Saved reports** page lists saved reports across the retained
 analysis database. It opens the newest report inline and supports alert-specific
 navigation from the inbox. No case attachment is needed. The case's **Agent
 review** tab lists linked reports before follow-up requests. The shared viewer
@@ -98,3 +98,17 @@ The frontend lockfile is present for `npm ci` and container builds. Bundle
 compilation, rendered design/accessibility, browser
 authorization flows, concurrency, interrupted-operation recovery and deployment
 TLS/CSP/container behavior have not yet been validated.
+
+## Case conversation UI
+
+Cases open on Conversation. A sidebar history provides direct case switching
+and creation, with Browse all cases for entries beyond the loaded page. The
+thread renders saved user turns and provisional assistant replies as text.
+Submission creates durable work rather than holding a browser request open
+through generation. Pending turn status is polled read-only every eight seconds
+while visible; leaving or locking cancels browser polling, not server work.
+
+The composer preserves the same idempotency key after an uncertain HTTP outcome.
+Background metadata refresh preserves the mounted composer. Review mode has no
+tools, while investigation mode needs attached evidence. Evidence and Responses
+are explicit workspace shortcuts; assistant text is never parsed into an action.

@@ -13,12 +13,13 @@ from hashlib import sha256
 from pathlib import Path
 from threading import Event
 
-COMMANDS = {"analyst-key", "serve-analyst", "request-investigation", "investigation-status", "investigation-worker", "graph-worker", "case-candidates"}
+COMMANDS = {"case-chat-worker", "analyst-key", "serve-analyst", "request-investigation", "investigation-status", "investigation-worker", "graph-worker", "case-candidates"}
 
 
 def register_backend_commands(commands):
     for name in sorted(COMMANDS):
         parser = commands.add_parser(name, help={
+            "case-chat-worker": "Process persistent case conversations with bounded read-only tools.",
             "analyst-key": "Generate an analyst bearer token and its configuration hash; display the token once.",
             "serve-analyst": "Run the separately authenticated analyst API.",
             "request-investigation": "Queue an explicit case re-investigation without replacing automatic jobs.",
@@ -52,15 +53,16 @@ def register_backend_commands(commands):
             parser.add_argument("--idempotency-key", required=True)
         if name == "investigation-status":
             parser.add_argument("--job-id", required=True)
-        if name in {"investigation-worker", "graph-worker"}:
+        if name in {"investigation-worker", "case-chat-worker", "graph-worker"}:
             parser.add_argument("--once", action="store_true")
-        if name == "investigation-worker":
+        if name in {"investigation-worker", "case-chat-worker"}:
             parser.add_argument("--database", type=Path, default=Path("data/chroma"))
             parser.add_argument("--catalog", type=Path, default=Path("data/catalogs/windows-security.json"))
             parser.add_argument("--sources-config", type=Path, default=Path("config/sources.yaml"))
             parser.add_argument("--model")
             parser.add_argument("--offline-knowledge", action="store_true")
-            parser.add_argument("--job-id")
+            if name == "investigation-worker":
+                parser.add_argument("--job-id")
         if name == "graph-worker":
             parser.add_argument("--poll-seconds", type=int, default=5)
 
@@ -102,8 +104,13 @@ def dispatch_backend_command(args: argparse.Namespace) -> bool:
         print(json.dumps(output, indent=2, ensure_ascii=False, allow_nan=False))
         return True
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    if name == "investigation-worker":
-        from cybertriage.bootstrap import build_requested_investigation_worker
+    if name in {"investigation-worker", "case-chat-worker"}:
+        from cybertriage.bootstrap import build_requested_investigation_worker, build_case_chat_worker
+        if name == "case-chat-worker":
+            chat_worker = build_case_chat_worker(args.alerts_database.resolve(), args.database, args.catalog,
+                args.sources_config, model_name=args.model, offline_knowledge=args.offline_knowledge)
+            chat_worker.run(Event(), once=args.once)
+            return True
         if args.job_id is not None and not args.once:
             raise ValueError("Targeted investigation processing requires --once.")
         worker = build_requested_investigation_worker(args.alerts_database.resolve(), args.database, args.catalog,
